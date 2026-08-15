@@ -23,7 +23,8 @@ id = "claude"
 name = "Claude Code"
 command = "claude"
 command_windows = "claude.cmd"
-args = []
+# El harness corre los agentes sin supervisión: sin prompts de permisos.
+args = ["--dangerously-skip-permissions"]
 resume_args = ["--resume", "{session_id}"]
 continue_args = ["--continue"]
 metrics = "claude-jsonl"
