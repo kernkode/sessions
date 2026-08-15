@@ -99,6 +99,7 @@ class TerminalPool {
   private active: string | null = null;
   private observer: ResizeObserver | null = null;
   private resizeTimer: number | null = null;
+  private fontLoadKey = "";
   /// Called when input cannot be delivered (the session already ended).
   private onInputRejected: ((id: string) => void) | null = null;
 
@@ -120,6 +121,49 @@ class TerminalPool {
     this.maxLive = Math.max(1, maxLive);
     for (const e of this.entries.values()) this.applyConfig(e);
     this.scheduleFit();
+    void this.preloadFonts();
+  }
+
+  /**
+   * Activates the terminal's font faces before the renderer rasterises them.
+   *
+   * Web fonts load lazily: the first bold output reaches the WebGL atlas while
+   * the 700 face is still downloading, so those glyphs are baked with a
+   * fallback font and the bold run looks uneven until a redraw (e.g. a
+   * selection) repaints it. Loading the faces explicitly and clearing the
+   * atlas once they are active makes the first paint already uniform.
+   */
+  private async preloadFonts() {
+    const family = this.cfg?.font_family ?? "monospace";
+    const size = this.cfg?.font_size ?? 13;
+    const key = `${family}@${size}`;
+    if (key === this.fontLoadKey) return;
+    this.fontLoadKey = key;
+
+    const names = family
+      .split(",")
+      .map((f) => f.trim().replace(/^["']|["']$/g, ""))
+      .filter((f) => f.length > 0 && !/^(monospace|serif|sans-serif)$/i.test(f));
+    const specs: string[] = [];
+    for (const name of names) {
+      for (const weight of ["400", "700"]) {
+        specs.push(`${weight} ${size}px "${name}"`);
+        specs.push(`${weight} italic ${size}px "${name}"`);
+      }
+    }
+    try {
+      await Promise.all(specs.map((s) => document.fonts.load(s)));
+    } catch {
+      // A missing face is fine: the browser falls back per glyph.
+    }
+    for (const e of this.entries.values()) {
+      try {
+        e.webgl?.clearTextureAtlas();
+        e.term.refresh(0, e.term.rows - 1);
+      } catch {
+        // The renderer may not be active yet.
+      }
+    }
   }
 
   setInputRejectedHandler(cb: (id: string) => void) {
@@ -148,6 +192,8 @@ class TerminalPool {
       existing.lastUsed = Date.now();
       return;
     }
+
+    void this.preloadFonts();
 
     const el = document.createElement("div");
     el.className = "term-instance";
