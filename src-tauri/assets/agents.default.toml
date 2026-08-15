@@ -28,7 +28,9 @@ resume_args = ["--resume", "{session_id}"]
 continue_args = ["--continue"]
 metrics = "claude-jsonl"
 color = "#d97757"
-busy_hints = ["esc to interrupt", "Thinking", "Working"]
+# Además de los textos, los glifos del spinner que el TUI anima mientras
+# trabaja (las versiones recientes ya no muestran «esc to interrupt»).
+busy_hints = ["esc to interrupt", "Thinking", "Working", "✢", "✳", "✶", "✻", "✽"]
 
 [agent.env]
 FORCE_COLOR = "1"

@@ -172,6 +172,7 @@ fn create_session(state: &AppState, req: CreateSessionRequest) -> Outcome<Sessio
             cols,
             rows,
             ring_bytes: perf.ring_buffer_kb * 1024,
+            busy_hints: plan.agent.busy_hints.clone(),
         })
         .map_err(err)?;
 

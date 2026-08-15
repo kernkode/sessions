@@ -380,6 +380,7 @@ mod tests {
             cols: 100,
             rows: 30,
             ring_bytes: 256 * 1024,
+            busy_hints: vec![],
         }
     }
 

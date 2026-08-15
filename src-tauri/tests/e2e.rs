@@ -159,6 +159,7 @@ fn full_cycle_config_pty_and_persistence() {
             cols: 100,
             rows: 30,
             ring_bytes: 64 * 1024,
+            busy_hints: vec![],
         })
         .expect("spawn");
     assert!(session.pid().is_some());
@@ -246,6 +247,7 @@ fn concurrent_sessions_do_not_interfere() {
             cols: 80,
             rows: 24,
             ring_bytes: 32 * 1024,
+            busy_hints: vec![],
         })
         .unwrap();
     }

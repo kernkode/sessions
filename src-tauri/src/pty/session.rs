@@ -29,6 +29,10 @@ pub struct SpawnSpec {
     pub cols: u16,
     pub rows: u16,
     pub ring_bytes: usize,
+    /// Texts in the output that mean the agent is working. When present,
+    /// only they mark the session as Working: the echo of the user's own
+    /// typing must not count as agent activity.
+    pub busy_hints: Vec<String>,
 }
 
 pub struct PtySession {
@@ -44,6 +48,12 @@ pub struct PtySession {
     exit_code: AtomicI64,
     exit_notified: AtomicBool,
     last_output_at: AtomicU64,
+    /// Lowercased busy_hints from the agent definition.
+    busy_hints: Vec<String>,
+    max_hint_len: usize,
+    /// Tail of the previous chunk, so hints split across reads still match.
+    busy_tail: Mutex<Vec<u8>>,
+    last_busy_at: AtomicU64,
     started_at: u64,
     cols: AtomicU64,
     rows: AtomicU64,
@@ -79,6 +89,14 @@ impl PtySession {
             .with_context(|| format!("lanzando {}", spec.program.display()))?;
         let pid = child.process_id();
 
+        let busy_hints: Vec<String> = spec
+            .busy_hints
+            .iter()
+            .map(|h| h.to_ascii_lowercase())
+            .filter(|h| !h.is_empty())
+            .collect();
+        let max_hint_len = busy_hints.iter().map(|h| h.len()).max().unwrap_or(0);
+
         // Close the slave side in the parent: on Unix that is what surfaces EOF.
         drop(pair.slave);
 
@@ -96,6 +114,10 @@ impl PtySession {
             exit_code: AtomicI64::new(-1),
             exit_notified: AtomicBool::new(false),
             last_output_at: AtomicU64::new(crate::model::now_ms()),
+            busy_hints,
+            max_hint_len,
+            busy_tail: Mutex::new(Vec::new()),
+            last_busy_at: AtomicU64::new(0),
             started_at: crate::model::now_ms(),
             cols: AtomicU64::new(cols as u64),
             rows: AtomicU64::new(rows as u64),
@@ -133,6 +155,17 @@ impl PtySession {
         self.last_output_at.load(Ordering::Relaxed)
     }
 
+    /// Last instant the output contained one of the agent's busy hints.
+    /// 0 when no hint has ever been seen.
+    pub fn last_busy_at(&self) -> u64 {
+        self.last_busy_at.load(Ordering::Relaxed)
+    }
+
+    /// `false` for agents without hints: their activity falls back to any output.
+    pub fn has_busy_hints(&self) -> bool {
+        !self.busy_hints.is_empty()
+    }
+
     pub fn size(&self) -> (u16, u16) {
         (self.cols.load(Ordering::Relaxed) as u16, self.rows.load(Ordering::Relaxed) as u16)
     }
@@ -141,10 +174,32 @@ impl PtySession {
     /// session has produced, which the pump uses to avoid delivering twice what
     /// an attaching terminal already received in its snapshot.
     pub fn on_output(&self, data: &[u8]) -> u64 {
-        self.last_output_at.store(crate::model::now_ms(), Ordering::Relaxed);
+        let now = crate::model::now_ms();
+        self.last_output_at.store(now, Ordering::Relaxed);
+        if !self.busy_hints.is_empty() {
+            self.scan_busy(data, now);
+        }
         let mut ring = self.ring.lock();
         ring.push(data);
         ring.total_bytes()
+    }
+
+    /// Looks for the agent's busy hints in the output, with ANSI sequences
+    /// stripped and a tail carried over so hints split across chunks match.
+    fn scan_busy(&self, data: &[u8], now: u64) {
+        let mut tail = self.busy_tail.lock();
+        let mut text = String::with_capacity(tail.len() + data.len());
+        text.push_str(&String::from_utf8_lossy(&tail));
+        text.push_str(&String::from_utf8_lossy(data));
+        // The tail is raw bytes: ANSI wrappers around the hint cost extra,
+        // so budget well past the hint length.
+        let keep = (self.max_hint_len * 2 + 16).min(data.len());
+        tail.clear();
+        tail.extend_from_slice(&data[data.len() - keep..]);
+        let plain = strip_ansi(&text).to_ascii_lowercase();
+        if self.busy_hints.iter().any(|h| plain.contains(h.as_str())) {
+            self.last_busy_at.store(now, Ordering::Relaxed);
+        }
     }
 
     pub fn total_output_bytes(&self) -> u64 {
@@ -238,6 +293,45 @@ impl PtySession {
     }
 }
 
+/// Removes CSI (`\x1b[…<letter>`) and OSC (`\x1b]…\x07`) sequences so hints
+/// remain searchable when the TUI interleaves escape codes with the text.
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            match chars.peek() {
+                Some('[') => {
+                    chars.next();
+                    for n in chars.by_ref() {
+                        if n.is_ascii_alphabetic() {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    chars.next();
+                    while let Some(n) = chars.next() {
+                        if n == '\x07' {
+                            break;
+                        }
+                        if n == '\x1b' {
+                            if matches!(chars.peek(), Some('\\')) {
+                                chars.next();
+                            }
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -270,6 +364,7 @@ pub(crate) mod tests {
             cols: 80,
             rows: 24,
             ring_bytes: 64 * 1024,
+            busy_hints: vec![],
         }
     }
 
@@ -338,6 +433,7 @@ pub(crate) mod tests {
             cols: 80,
             rows: 24,
             ring_bytes: 16 * 1024,
+            busy_hints: vec![],
         };
         let (session, reader) = PtySession::spawn(&s).unwrap();
         let out = read_until_exit(reader, &session);
@@ -370,6 +466,33 @@ pub(crate) mod tests {
         }
         assert!(!session.is_alive());
         session.release();
+    }
+
+    #[test]
+    fn busy_hints_match_across_chunks_and_ansi() {
+        let mut s = spec("t6", "echo x");
+        s.busy_hints = vec!["esc to interrupt".into()];
+        let (session, _r) = PtySession::spawn(&s).unwrap();
+        assert_eq!(session.last_busy_at(), 0);
+
+        // Plain output (e.g. the user's echoed typing) is not activity.
+        session.on_output(b"hello world\r\n");
+        assert_eq!(session.last_busy_at(), 0, "echo must not mark busy");
+
+        // The hint arrives wrapped in ANSI and split across two chunks.
+        session.on_output(b"\x1b[2mesc to inter\x1b[22m");
+        session.on_output(b"\x1b[2mrupt\x1b[22m\r\n");
+        assert!(session.last_busy_at() > 0, "split hint must match");
+        let _ = session.kill();
+        session.release();
+    }
+
+    #[test]
+    fn strip_ansi_removes_csi_and_osc() {
+        assert_eq!(strip_ansi("\x1b[31mred\x1b[0m"), "red");
+        assert_eq!(strip_ansi("\x1b]0;title\x07txt"), "txt");
+        assert_eq!(strip_ansi("\x1b]0;title\x1b\\txt"), "txt");
+        assert_eq!(strip_ansi("\x1b[2mesc to interrupt\x1b[22m"), "esc to interrupt");
     }
 
     #[test]

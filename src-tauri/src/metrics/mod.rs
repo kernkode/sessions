@@ -269,7 +269,17 @@ fn session_status(pty: &Arc<PtySession>) -> SessionStatus {
     if !pty.is_alive() {
         return SessionStatus::Exited;
     }
-    if now_ms().saturating_sub(pty.last_output_at()) < 1_500 {
+    let now = now_ms();
+    // Agents with busy_hints are Working only while their own activity
+    // markers appear: the echo of the user's typing is not work. Agents
+    // without hints (a plain terminal) fall back to any recent output.
+    if pty.has_busy_hints() {
+        if now.saturating_sub(pty.last_busy_at()) < 1_500 {
+            SessionStatus::Working
+        } else {
+            SessionStatus::Idle
+        }
+    } else if now.saturating_sub(pty.last_output_at()) < 1_500 {
         SessionStatus::Working
     } else {
         SessionStatus::Idle
@@ -431,6 +441,7 @@ mod tests {
             cols: 80,
             rows: 24,
             ring_bytes: 32 * 1024,
+            busy_hints: vec![],
         };
         let (s, _r) = PtySession::spawn(&spec).unwrap();
         s
