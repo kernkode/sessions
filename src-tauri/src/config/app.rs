@@ -152,8 +152,6 @@ impl PerformanceSection {
 #[serde(default)]
 pub struct DefaultsSection {
     pub agent: Option<String>,
-    pub provider: Option<String>,
-    pub model: Option<String>,
     /// Initial working directory for new sessions.
     pub cwd: Option<String>,
     /// Initial PTY size, before the first `fit`.

@@ -54,14 +54,9 @@ export function SessionHeader() {
         {agent?.name ?? session.agent_id}
       </span>
 
-      {session.model && (
-        <span className="chip mono" title="Modelo en uso">
-          {session.model}
-        </span>
-      )}
-      {session.provider_id && (
-        <span className="chip" title="Proveedor">
-          {session.provider_id}
+      {m?.model && (
+        <span className="chip mono" title="Modelo que informa el CLI">
+          {m.model}
         </span>
       )}
       <span className="chip mono" title="Tiempo de sesión">

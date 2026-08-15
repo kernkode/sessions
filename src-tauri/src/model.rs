@@ -41,10 +41,6 @@ pub struct SessionMeta {
     pub project_id: String,
     pub title: String,
     pub agent_id: String,
-    #[serde(default)]
-    pub provider_id: Option<String>,
-    #[serde(default)]
-    pub model: Option<String>,
     pub cwd: String,
     /// Session id of the CLI itself (to resume it and to read its metrics).
     #[serde(default)]
@@ -74,10 +70,6 @@ pub struct CreateSessionRequest {
     pub project_id: Option<String>,
     pub project_path: Option<String>,
     pub agent_id: String,
-    #[serde(default)]
-    pub provider_id: Option<String>,
-    #[serde(default)]
-    pub model: Option<String>,
     #[serde(default)]
     pub title: Option<String>,
     #[serde(default)]
@@ -120,7 +112,7 @@ pub struct SessionMetrics {
     /// PTY output rate: an activity signal that is always available.
     pub bytes_per_second: f64,
     pub total_bytes: u64,
-    /// Estimated cost in USD from the provider's `pricing`.
+    /// Cost in USD as reported by the agent.
     pub cost_usd: f64,
     pub model: Option<String>,
     /// Session id in the CLI itself (enables resuming).

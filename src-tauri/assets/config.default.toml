@@ -39,8 +39,6 @@ process_sample_ms = 0       # muestreo de CPU/RAM del arbol de procesos; la barr
 
 [defaults]
 agent = "claude"
-provider = "anthropic"
-# model = "claude-sonnet-4-5"
 # cwd = "C:/Users/tu-usuario/proyectos"
 cols = 120
 rows = 32

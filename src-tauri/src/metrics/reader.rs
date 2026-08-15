@@ -16,7 +16,7 @@ pub struct Usage {
     pub total_output: u64,
     /// Tokens currently occupying the context window.
     pub context_used: u64,
-    /// Window reported by the agent (takes precedence over providers.toml).
+    /// Window reported by the agent.
     pub context_window: Option<u64>,
     pub model: Option<String>,
     pub turns: u32,

@@ -66,8 +66,8 @@ impl Env {
         Self { dir, config, store }
     }
 
-    /// Defines an agent pointing at a real shell and a provider whose environment
-    /// mapping can be verified in the process output.
+    /// Defines an agent pointing at a real shell whose environment can be
+    /// verified in the process output.
     fn with_echo_agent(&self) {
         let (cmd, echo) = if cfg!(windows) {
             ("cmd", "echo MODEL=%MY_MODEL% URL=%MY_URL% KEY=%MY_KEY%")
@@ -90,47 +90,14 @@ id = "echo"
 name = "Echo Agent"
 command = "{cmd}"
 {args}
-model_args = ["--model", "{{model}}"]
 metrics = "none"
 
 [agent.env]
-MY_URL = "agent-value"
+MY_URL = "https://api.test.dev/v1"
+MY_MODEL = "big-model"
+MY_KEY = "sk-secret"
 "#
             ),
-        )
-        .unwrap();
-
-        std::fs::write(
-            &self.config.paths().providers,
-            r#"
-schema = 1
-
-[[provider]]
-id = "test"
-name = "Test provider"
-kind = "openai-chat"
-base_url = "https://api.test.dev"
-api_key = "sk-secret"
-default_model = "big-model"
-agents = ["echo"]
-
-[[provider.model]]
-id = "big-model"
-remote_id = "test/big-1"
-context_window = 123456
-max_output_tokens = 4096
-
-[provider.model.pricing]
-input = 3.0
-output = 15.0
-
-[provider.env.all]
-MY_KEY = "{api_key}"
-
-[provider.env.echo]
-MY_URL = "{base_url}/v1"
-MY_MODEL = "{model}"
-"#,
         )
         .unwrap();
         self.config.reload();
@@ -169,18 +136,14 @@ fn full_cycle_config_pty_and_persistence() {
     // 1. Launch plan built from the TOML files.
     let req = CreateSessionRequest {
         agent_id: "echo".into(),
-        provider_id: Some("test".into()),
         cwd: Some(std::env::temp_dir().display().to_string()),
         ..Default::default()
     };
     let plan = sessions_lib::launcher::plan(&env.config, &req).expect("plan");
     let map: HashMap<_, _> = plan.env.iter().cloned().collect();
-    assert_eq!(map["MY_URL"], "https://api.test.dev/v1", "the provider wins over the agent");
+    assert_eq!(map["MY_URL"], "https://api.test.dev/v1");
     assert_eq!(map["MY_KEY"], "sk-secret");
-    // `{model}` uses the default model's remote_id.
-    assert_eq!(map["MY_MODEL"], "test/big-1");
-    // The provider already injects the model, so `--model` is not added.
-    assert!(!plan.args.contains(&"--model".to_string()));
+    assert_eq!(map["MY_MODEL"], "big-model");
 
     // 2. Real launch and output through the manager.
     let sink = Arc::new(Sink::default());
@@ -212,8 +175,6 @@ fn full_cycle_config_pty_and_persistence() {
         metrics_source: MetricsSource::None,
         metrics_path: None,
         cwd: plan.cwd.display().to_string(),
-        provider_id: Some("test".into()),
-        model: Some("big-model".into()),
         external_id: None,
         pty: session.clone(),
     });
@@ -225,8 +186,6 @@ fn full_cycle_config_pty_and_persistence() {
         project_id: project.id.clone(),
         title: "Echo".into(),
         agent_id: "echo".into(),
-        provider_id: Some("test".into()),
-        model: Some("big-model".into()),
         cwd: plan.cwd.display().to_string(),
         created_at: now_ms(),
         pid: session.pid(),
@@ -240,13 +199,10 @@ fn full_cycle_config_pty_and_persistence() {
     assert!(wait_for(30, || sink.finished(&id)), "the process did not finish");
 
     let out = sink.text(&id);
-    assert!(out.contains("MODEL=test/big-1"), "output: {out:?}");
+    assert!(out.contains("MODEL=big-model"), "output: {out:?}");
     assert!(out.contains("URL=https://api.test.dev/v1"), "output: {out:?}");
     assert!(out.contains("KEY=sk-secret"), "output: {out:?}");
 
-    // The context window comes from providers.toml.
-    let m = hub.snapshot(&id).expect("metrics");
-    assert_eq!(m.context_window, Some(123_456));
     assert!(wait_for(10, || hub
         .snapshot(&id)
         .map(|m| m.status == SessionStatus::Exited)
@@ -257,7 +213,7 @@ fn full_cycle_config_pty_and_persistence() {
     // only faithful way to reproduce a TUI screen.
     env.store.save_scrollback(&id, &session.scrollback());
     let restored = String::from_utf8_lossy(&env.store.load_scrollback(&id)).to_string();
-    assert!(restored.contains("MODEL=test/big-1"));
+    assert!(restored.contains("MODEL=big-model"));
 
     hub.shutdown();
     mgr.shutdown();
@@ -316,34 +272,34 @@ fn concurrent_sessions_do_not_interfere() {
 }
 
 #[test]
-fn hot_reload_of_providers_toml() {
+fn hot_reload_of_agents_toml() {
     let env = Env::new("reload");
     env.with_echo_agent();
-    assert_eq!(env.config.context_window(Some("test"), Some("big-model")), Some(123_456));
+    assert_eq!(env.config.agent("echo").unwrap().env["MY_MODEL"], "big-model");
 
     // The user edits the file while the app is running.
-    let contents = std::fs::read_to_string(&env.config.paths().providers).unwrap();
+    let contents = std::fs::read_to_string(&env.config.paths().agents).unwrap();
     std::fs::write(
-        &env.config.paths().providers,
-        contents.replace("context_window = 123456", "context_window = 999000"),
+        &env.config.paths().agents,
+        contents.replace("big-model", "other-model"),
     )
     .unwrap();
     let snap = env.config.reload();
     assert!(snap.issues.is_empty(), "{:?}", snap.issues);
-    assert_eq!(env.config.context_window(Some("test"), Some("big-model")), Some(999_000));
+    assert_eq!(env.config.agent("echo").unwrap().env["MY_MODEL"], "other-model");
 
     // A broken TOML does not take the app down: it warns and uses factory values.
-    std::fs::write(&env.config.paths().providers, "]]not toml[[").unwrap();
+    std::fs::write(&env.config.paths().agents, "]]not toml[[").unwrap();
     let snap = env.config.reload();
-    assert!(snap.issues.iter().any(|i| i.file == "providers.toml"));
-    assert!(!snap.providers.is_empty());
+    assert!(snap.issues.iter().any(|i| i.file == "agents.toml"));
+    assert!(!snap.agents.is_empty());
 }
 
 #[test]
 fn bootstrap_creates_the_user_directory_with_the_toml_files() {
     let env = Env::new("bootstrap");
     let p = env.config.paths();
-    for f in [&p.config, &p.providers, &p.agents] {
+    for f in [&p.config, &p.agents] {
         assert!(f.is_file(), "missing {}", f.display());
         let text = std::fs::read_to_string(f).unwrap();
         assert!(text.len() > 200, "{} looks empty", f.display());
@@ -352,12 +308,12 @@ fn bootstrap_creates_the_user_directory_with_the_toml_files() {
     assert!(p.state.is_dir());
     assert!(p.logs.is_dir());
 
-    // The factory providers cover the three main agents.
+    // The factory agents cover the CLIs the app knows how to launch.
     let snap = env.config.snapshot();
-    for agent in ["claude", "codex", "opencode"] {
+    for agent in ["claude", "codex", "opencode", "pi", "shell"] {
         assert!(
-            snap.providers.iter().any(|pr| pr.supported_agents.iter().any(|a| a == agent)),
-            "no factory provider configures «{agent}»"
+            snap.agents.iter().any(|a| a.id == agent),
+            "the factory agents do not include «{agent}»"
         );
     }
 }

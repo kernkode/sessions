@@ -9,8 +9,6 @@ import type {
   CreateSessionRequest,
   DirEntry,
   Project,
-  Provider,
-  ProviderCheck,
   SessionMeta,
   SessionMetrics,
 } from "./types";
@@ -22,12 +20,6 @@ export const api = {
   bootstrap: () => invoke<Bootstrap>("bootstrap"),
   configReload: () => invoke<ConfigSnapshot>("config_reload"),
   configPaths: () => invoke<ConfigPaths>("config_paths"),
-
-  providerKinds: () => invoke<string[]>("provider_kinds"),
-  providerUpsert: (provider: Provider) => invoke<ConfigSnapshot>("provider_upsert", { provider }),
-  providerRemove: (id: string) => invoke<ConfigSnapshot>("provider_remove", { id }),
-  providerCheck: (provider: Provider, model?: string | null) =>
-    invoke<ProviderCheck>("provider_check", { provider, model }),
 
   projectAdd: (path: string, name?: string) => invoke<Project>("project_add", { path, name }),
   projectRename: (id: string, name: string) => invoke<boolean>("project_rename", { id, name }),

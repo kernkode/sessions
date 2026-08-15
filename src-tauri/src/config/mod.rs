@@ -2,8 +2,6 @@
 
 pub mod agents;
 pub mod app;
-pub mod edit;
-pub mod providers;
 
 use std::fs;
 
@@ -14,7 +12,6 @@ use serde::Serialize;
 use crate::paths::Paths;
 use agents::{Agent, AgentsFile};
 use app::AppConfig;
-use providers::{Provider, ProvidersFile};
 
 /// A non-fatal problem while loading configuration: it is shown in the UI and the
 /// app carries on with factory defaults instead of refusing to start.
@@ -27,7 +24,6 @@ pub struct ConfigIssue {
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ConfigSnapshot {
     pub app: AppConfig,
-    pub providers: Vec<Provider>,
     pub agents: Vec<Agent>,
     pub issues: Vec<ConfigIssue>,
     /// Real paths, so the UI can open them in an editor.
@@ -38,7 +34,6 @@ pub struct ConfigSnapshot {
 pub struct ConfigPaths {
     pub root: String,
     pub config: String,
-    pub providers: String,
     pub agents: String,
 }
 
@@ -82,62 +77,14 @@ impl ConfigStore {
     pub fn agent(&self, id: &str) -> Option<Agent> {
         self.snapshot.read().agents.iter().find(|a| a.id == id).cloned()
     }
-
-    pub fn provider(&self, id: &str) -> Option<Provider> {
-        self.snapshot.read().providers.iter().find(|p| p.id == id).cloned()
-    }
-
-    /// Context window declared for a provider/model pair.
-    pub fn context_window(&self, provider_id: Option<&str>, model: Option<&str>) -> Option<u64> {
-        let snap = self.snapshot.read();
-        if let Some(pid) = provider_id {
-            if let Some(p) = snap.providers.iter().find(|p| p.id == pid) {
-                if let Some(cw) = p.context_window_for(model) {
-                    return Some(cw);
-                }
-            }
-        }
-        // Without a provider: look the model up in any known provider.
-        let model = model?;
-        snap.providers
-            .iter()
-            .filter_map(|p| p.find_model(model))
-            .find_map(|m| m.context_window)
-    }
 }
 
 fn build_snapshot(paths: &Paths) -> ConfigSnapshot {
     let mut issues = Vec::new();
 
     let app: AppConfig = read_toml(&paths.config, app::DEFAULT_CONFIG_TOML, &mut issues);
-    let providers_file: ProvidersFile =
-        read_toml(&paths.providers, providers::DEFAULT_PROVIDERS_TOML, &mut issues);
     let agents_file: AgentsFile =
         read_toml(&paths.agents, agents::DEFAULT_AGENTS_TOML, &mut issues);
-
-    let mut providers = providers_file.providers;
-    let mut seen = std::collections::HashSet::new();
-    providers.retain(|p| {
-        if p.id.trim().is_empty() {
-            issues.push(ConfigIssue {
-                file: "providers.toml".into(),
-                message: "proveedor sin `id`: descartado".into(),
-            });
-            return false;
-        }
-        if !seen.insert(p.id.clone()) {
-            issues.push(ConfigIssue {
-                file: "providers.toml".into(),
-                message: format!("`id` duplicado «{}»: se ignora la repetición", p.id),
-            });
-            return false;
-        }
-        true
-    });
-    // Computed field: the UI uses it so the compatibility rules live in one place.
-    for p in providers.iter_mut() {
-        p.supported_agents = p.compute_supported_agents();
-    }
 
     let mut agents = agents_file.agents;
     let mut seen_agents = std::collections::HashSet::new();
@@ -158,13 +105,11 @@ fn build_snapshot(paths: &Paths) -> ConfigSnapshot {
 
     ConfigSnapshot {
         app,
-        providers,
         agents,
         issues,
         paths: ConfigPaths {
             root: paths.root.display().to_string(),
             config: paths.config.display().to_string(),
-            providers: paths.providers.display().to_string(),
             agents: paths.agents.display().to_string(),
         },
     }
@@ -215,60 +160,45 @@ mod tests {
         let (store, dir) = temp_store();
         let snap = store.snapshot();
         assert!(snap.issues.is_empty(), "issues: {:?}", snap.issues);
-        assert!(snap.providers.len() >= 3);
         assert!(snap.agents.iter().any(|a| a.id == "claude"));
-        // `mi-gateway` ships disabled but is still listed.
-        assert!(snap.providers.iter().any(|p| p.id == "mi-gateway" && !p.enabled));
-        // The computed field reaches the UI.
-        let anth = snap.providers.iter().find(|p| p.id == "anthropic").unwrap();
-        assert!(anth.supported_agents.contains(&"claude".to_string()));
+        assert!(snap.agents.iter().any(|a| a.id == "pi"));
         fs::remove_dir_all(dir).ok();
     }
 
     #[test]
     fn invalid_toml_does_not_break_the_app() {
         let (store, dir) = temp_store();
-        fs::write(&store.paths().providers, "this ][ is not toml").unwrap();
+        fs::write(&store.paths().agents, "this ][ is not toml").unwrap();
         let snap = store.reload();
-        assert!(snap.issues.iter().any(|i| i.file == "providers.toml"));
-        // There are still usable providers (the factory ones).
-        assert!(!snap.providers.is_empty());
+        assert!(snap.issues.iter().any(|i| i.file == "agents.toml"));
+        // There are still usable agents (the factory ones).
+        assert!(!snap.agents.is_empty());
         fs::remove_dir_all(dir).ok();
     }
 
     #[test]
-    fn duplicate_ids_are_discarded() {
+    fn duplicate_and_disabled_agents_are_discarded() {
         let (store, dir) = temp_store();
         let dup = r#"
-[[provider]]
-id = "x"
-[[provider.model]]
-id = "m"
-context_window = 1000
+schema = 1
 
-[[provider]]
+[[agent]]
 id = "x"
-[[provider.model]]
-id = "m2"
-context_window = 2000
+command = "cmd"
+
+[[agent]]
+id = "x"
+command = "cmd"
+
+[[agent]]
+id = "off"
+command = "cmd"
+enabled = false
 "#;
-        fs::write(&store.paths().providers, dup).unwrap();
+        fs::write(&store.paths().agents, dup).unwrap();
         let snap = store.reload();
-        assert_eq!(snap.providers.iter().filter(|p| p.id == "x").count(), 1);
-        assert!(snap.issues.iter().any(|i| i.message.contains("duplicado")));
-        fs::remove_dir_all(dir).ok();
-    }
-
-    #[test]
-    fn context_window_resolves_by_provider_and_by_model() {
-        let (store, dir) = temp_store();
-        assert_eq!(
-            store.context_window(Some("anthropic"), Some("claude-sonnet-4-5")),
-            Some(200_000)
-        );
-        // Without an explicit provider, the model is looked up in all of them.
-        assert_eq!(store.context_window(None, Some("gemini-3-pro")), Some(1_048_576));
-        assert_eq!(store.context_window(None, Some("does-not-exist")), None);
+        assert_eq!(snap.agents.iter().filter(|a| a.id == "x").count(), 1);
+        assert!(!snap.agents.iter().any(|a| a.id == "off"));
         fs::remove_dir_all(dir).ok();
     }
 }

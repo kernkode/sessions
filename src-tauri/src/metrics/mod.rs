@@ -36,8 +36,6 @@ pub struct TrackSpec {
     pub metrics_source: MetricsSource,
     pub metrics_path: Option<String>,
     pub cwd: String,
-    pub provider_id: Option<String>,
-    pub model: Option<String>,
     pub external_id: Option<String>,
     pub pty: Arc<PtySession>,
 }
@@ -59,7 +57,6 @@ pub struct MetricsHub {
     tracks: Arc<Mutex<HashMap<String, Track>>>,
     stop: Arc<AtomicBool>,
     thread: Mutex<Option<std::thread::JoinHandle<()>>>,
-    config: Arc<ConfigStore>,
 }
 
 impl MetricsHub {
@@ -70,26 +67,20 @@ impl MetricsHub {
         let thread = {
             let tracks = tracks.clone();
             let stop = stop.clone();
-            let config = config.clone();
             std::thread::Builder::new()
                 .name("sessions-metrics".into())
                 .spawn(move || poll_loop(tracks, config, sink, stop))
                 .expect("could not spawn the metrics thread")
         };
 
-        Self { tracks, stop, thread: Mutex::new(Some(thread)), config }
+        Self { tracks, stop, thread: Mutex::new(Some(thread)) }
     }
 
     pub fn track(&self, spec: TrackSpec) {
         let reader = build_reader(&spec);
         let id = spec.session_id.clone();
-        let window = self
-            .config
-            .context_window(spec.provider_id.as_deref(), spec.model.as_deref());
         let initial = SessionMetrics {
             session_id: id.clone(),
-            model: spec.model.clone(),
-            context_window: window,
             status: SessionStatus::Idle,
             updated_at: now_ms(),
             ..Default::default()
@@ -240,7 +231,7 @@ fn poll_loop(
                 };
 
                 let (cpu, mem) = sampler.usage(t.spec.pty.pid());
-                let m = compose(t, &config, status, total_bytes, bps, cpu, mem);
+                let m = compose(t, status, total_bytes, bps, cpu, mem);
 
                 if is_relevant_change(&t.last, &m) {
                     t.last = m.clone();
@@ -268,34 +259,11 @@ fn session_status(pty: &Arc<PtySession>) -> SessionStatus {
     }
 }
 
-fn compose(
-    t: &Track,
-    config: &Arc<ConfigStore>,
-    status: SessionStatus,
-    total_bytes: u64,
-    bps: f64,
-    cpu: f32,
-    mem: u64,
-) -> SessionMetrics {
+fn compose(t: &Track, status: SessionStatus, total_bytes: u64, bps: f64, cpu: f32, mem: u64) -> SessionMetrics {
     let u = &t.usage;
-    let model = u.model.clone().or_else(|| t.spec.model.clone());
-    // Priority: the window the agent reports > the one declared in providers.toml.
-    let window = u
-        .context_window
-        .or_else(|| config.context_window(t.spec.provider_id.as_deref(), model.as_deref()));
-
-    let cost = u.cost_usd.unwrap_or_else(|| {
-        t.spec
-            .provider_id
-            .as_deref()
-            .and_then(|pid| config.provider(pid))
-            .and_then(|p| {
-                let m = p.find_model(model.as_deref().unwrap_or_default())?;
-                let pr = m.pricing?;
-                Some(pr.cost(u.total_input, u.total_output, u.cache_read, u.cache_write))
-            })
-            .unwrap_or(0.0)
-    });
+    // Window and cost are whatever the agent itself reports.
+    let window = u.context_window;
+    let cost = u.cost_usd.unwrap_or(0.0);
 
     SessionMetrics {
         session_id: t.spec.session_id.clone(),
@@ -314,7 +282,7 @@ fn compose(
         bytes_per_second: round2(bps),
         total_bytes,
         cost_usd: cost,
-        model,
+        model: u.model.clone(),
         external_id: u.external_id.clone(),
         turns: u.turns,
         uptime_ms: t.spec.pty.uptime_ms(),
@@ -462,8 +430,6 @@ mod tests {
             metrics_source: MetricsSource::None,
             metrics_path: None,
             cwd: std::env::temp_dir().display().to_string(),
-            provider_id: None,
-            model: None,
             external_id: None,
             pty: pty.clone(),
         });
@@ -487,33 +453,6 @@ mod tests {
         hub.untrack("m1");
         assert!(hub.snapshot("m1").is_none());
         hub.shutdown();
-        pty.release();
-        std::fs::remove_dir_all(dir).ok();
-    }
-
-    #[test]
-    fn context_window_comes_from_providers_toml() {
-        let (config, dir) = temp_config();
-        let sink = Arc::new(TestSink(Mutex::new(Vec::new())));
-        let hub = MetricsHub::new(config, Arc::new(sink));
-        let pty = test_pty("echo x");
-
-        hub.track(TrackSpec {
-            session_id: "m2".into(),
-            agent_id: "claude".into(),
-            metrics_source: MetricsSource::None,
-            metrics_path: None,
-            cwd: "C:\\does\\not\\matter".into(),
-            provider_id: Some("anthropic".into()),
-            model: Some("claude-sonnet-4-5".into()),
-            external_id: None,
-            pty: pty.clone(),
-        });
-
-        let m = hub.snapshot("m2").unwrap();
-        assert_eq!(m.context_window, Some(200_000));
-        hub.shutdown();
-        let _ = pty.kill();
         pty.release();
         std::fs::remove_dir_all(dir).ok();
     }

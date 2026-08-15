@@ -29,8 +29,6 @@ pub struct AgentStatus {
     pub path: Option<String>,
     pub color: Option<String>,
     pub metrics: bool,
-    /// Providers from providers.toml compatible with this agent.
-    pub providers: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -71,12 +69,6 @@ fn agent_statuses(snap: &ConfigSnapshot) -> Vec<AgentStatus> {
                 path: path.map(|p| p.display().to_string()),
                 color: a.color.clone(),
                 metrics: a.metrics != crate::config::agents::MetricsSource::None,
-                providers: snap
-                    .providers
-                    .iter()
-                    .filter(|p| p.supports_agent(&a.id))
-                    .map(|p| p.id.clone())
-                    .collect(),
             }
         })
         .collect()
@@ -90,188 +82,6 @@ pub fn config_reload(state: State<'_, AppState>) -> ConfigSnapshot {
 #[tauri::command]
 pub fn config_paths(state: State<'_, AppState>) -> ConfigPaths {
     state.config.snapshot().paths
-}
-
-// ───────────────────────────── Providers ─────────────────────────────
-
-/// Accepted provider kinds, for the editor dropdown.
-#[tauri::command]
-pub fn provider_kinds() -> Vec<String> {
-    crate::config::providers::ProviderKind::all()
-        .iter()
-        .map(|k| k.as_str().to_string())
-        .collect()
-}
-
-/// Creates or updates a provider in `providers.toml` and returns the reloaded
-/// configuration.
-#[tauri::command]
-pub fn provider_upsert(
-    state: State<'_, AppState>,
-    provider: crate::config::providers::Provider,
-) -> Outcome<ConfigSnapshot> {
-    let p = validate_provider(provider)?;
-    crate::config::edit::upsert_provider(&state.config.paths().providers, &p).map_err(err)?;
-    Ok(state.config.reload())
-}
-
-#[tauri::command]
-pub fn provider_remove(state: State<'_, AppState>, id: String) -> Outcome<ConfigSnapshot> {
-    crate::config::edit::remove_provider(&state.config.paths().providers, &id).map_err(err)?;
-    Ok(state.config.reload())
-}
-
-/// Checks what is about to be written and normalises whitespace.
-fn validate_provider(
-    mut p: crate::config::providers::Provider,
-) -> Outcome<crate::config::providers::Provider> {
-    p.id = p.id.trim().to_string();
-    if p.id.is_empty() {
-        return Err("el identificador no puede estar vacío".into());
-    }
-    if !p.id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
-        return Err(format!(
-            "el identificador «{}» solo admite letras, dígitos, punto, guion y subrayado",
-            p.id
-        ));
-    }
-
-    let mut seen = std::collections::HashSet::new();
-    for m in &mut p.models {
-        m.id = m.id.trim().to_string();
-        if m.id.is_empty() {
-            return Err("hay un modelo sin identificador".into());
-        }
-        if !seen.insert(m.id.clone()) {
-            return Err(format!("el modelo «{}» está repetido", m.id));
-        }
-    }
-
-    if let Some(d) = p.default_model.as_ref().filter(|d| !d.trim().is_empty()) {
-        if p.find_model(d).is_none() {
-            return Err(format!("el modelo por defecto «{d}» no está en la lista de modelos"));
-        }
-    }
-    if let Some(s) = p.small_model.as_ref().filter(|s| !s.trim().is_empty()) {
-        if p.find_model(s).is_none() {
-            return Err(format!("el modelo económico «{s}» no está en la lista de modelos"));
-        }
-    }
-    // Empty environment and argument blocks are dropped.
-    p.env.retain(|_, v| !v.is_empty());
-    p.args.retain(|_, v| !v.is_empty());
-    Ok(p)
-}
-
-/// What each agent will receive with this provider. Powers the editor's "Check"
-/// button: it resolves the key for real and shows the resulting environment, with
-/// secrets masked.
-#[derive(Debug, Clone, Serialize)]
-pub struct ProviderCheck {
-    pub key_source: String,
-    pub key_found: bool,
-    pub key_hint: Option<String>,
-    pub key_error: Option<String>,
-    pub model: Option<String>,
-    pub context_window: Option<u64>,
-    pub agents: Vec<AgentPreview>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AgentPreview {
-    pub agent_id: String,
-    pub agent_name: String,
-    pub installed: bool,
-    pub supported: bool,
-    /// `true` when the mapping comes from the `kind` template, not from own blocks.
-    pub from_template: bool,
-    pub env: Vec<(String, String)>,
-    pub args: Vec<String>,
-}
-
-#[tauri::command]
-pub fn provider_check(
-    state: State<'_, AppState>,
-    provider: crate::config::providers::Provider,
-    model: Option<String>,
-) -> ProviderCheck {
-    let snap = state.config.snapshot();
-    let key = provider.resolve_api_key();
-    let model = model.or_else(|| provider.default_model.clone());
-
-    let mask = |text: &str| -> String {
-        match key.as_deref() {
-            Some(k) if !k.is_empty() && text.contains(k) => {
-                let tail: String =
-                    k.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
-                text.replace(k, &format!("••••••{tail}"))
-            }
-            _ => text.to_string(),
-        }
-    };
-
-    let agents = snap
-        .agents
-        .iter()
-        .filter(|a| {
-            // AI agents (those with their own telemetry) are listed even when they
-            // are not compatible, so the UI can explain why. A plain terminal has
-            // nothing to do with providers.
-            a.metrics != crate::config::agents::MetricsSource::None || provider.supports_agent(&a.id)
-        })
-        .map(|a| AgentPreview {
-            agent_id: a.id.clone(),
-            agent_name: a.display_name().to_string(),
-            installed: a.resolve_program().is_some(),
-            supported: provider.supports_agent(&a.id),
-            from_template: !provider.env.contains_key(&a.id) && !provider.args.contains_key(&a.id),
-            env: provider
-                .env_for(&a.id, model.as_deref())
-                .into_iter()
-                .map(|(k, v)| (k, mask(&v)))
-                .collect(),
-            args: provider.args_for(&a.id, model.as_deref()).iter().map(|s| mask(s)).collect(),
-        })
-        .collect();
-
-    let (key_hint, key_error) = match &key {
-        Some(k) => {
-            let tail: String =
-                k.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
-            (Some(format!("{} caracteres · …{tail}", k.chars().count())), None)
-        }
-        None => (
-            None,
-            Some(match provider.key_source() {
-                "none" => "no has indicado de dónde sacar la clave".to_string(),
-                "env" => format!(
-                    "la variable {} no está definida en el entorno de la app",
-                    provider.api_key_env.clone().unwrap_or_default()
-                ),
-                "file" => format!(
-                    "no se pudo leer la clave de {}{}",
-                    provider.api_key_file.clone().unwrap_or_default(),
-                    provider
-                        .api_key_json_path
-                        .as_deref()
-                        .map(|p| format!(" (ruta JSON «{p}»)"))
-                        .unwrap_or_default()
-                ),
-                "command" => "el comando no devolvió nada o falló".to_string(),
-                _ => "la clave está vacía".to_string(),
-            }),
-        ),
-    };
-
-    ProviderCheck {
-        key_source: provider.key_source().to_string(),
-        key_found: key.is_some(),
-        key_hint,
-        key_error,
-        context_window: provider.context_window_for(model.as_deref()),
-        model,
-        agents,
-    }
 }
 
 // ───────────────────────────── Projects ─────────────────────────────
@@ -370,11 +180,6 @@ fn create_session(state: &AppState, req: CreateSessionRequest) -> Outcome<Sessio
         project_id: project,
         title: req.title.clone().unwrap_or_else(|| plan.agent.display_name().to_string()),
         agent_id: plan.agent.id.clone(),
-        provider_id: plan.provider.as_ref().map(|p| p.id.clone()),
-        model: req
-            .model
-            .clone()
-            .or_else(|| plan.provider.as_ref().and_then(|p| p.default_model.clone())),
         cwd: plan.cwd.display().to_string(),
         external_id: req.resume_external_id.clone(),
         created_at: now_ms(),
@@ -394,8 +199,6 @@ fn create_session(state: &AppState, req: CreateSessionRequest) -> Outcome<Sessio
         metrics_source: plan.agent.metrics,
         metrics_path: plan.agent.metrics_path.clone(),
         cwd: meta.cwd.clone(),
-        provider_id: meta.provider_id.clone(),
-        model: meta.model.clone(),
         external_id: meta.external_id.clone(),
         pty: session,
     });
@@ -521,8 +324,6 @@ fn relaunch(state: &AppState, previous: &SessionMeta, resume: bool) -> Outcome<S
         project_id: Some(previous.project_id.clone()),
         project_path: None,
         agent_id: previous.agent_id.clone(),
-        provider_id: previous.provider_id.clone(),
-        model: previous.model.clone(),
         title: Some(previous.title.clone()),
         cwd: Some(previous.cwd.clone()),
         resume_external_id: if resume { previous.external_id.clone() } else { None },
@@ -663,10 +464,6 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
         bootstrap,
         config_reload,
         config_paths,
-        provider_kinds,
-        provider_upsert,
-        provider_remove,
-        provider_check,
         project_add,
         project_rename,
         project_set_collapsed,

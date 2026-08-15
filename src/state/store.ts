@@ -10,12 +10,11 @@ import type {
   ConfigSnapshot,
   CreateSessionRequest,
   Project,
-  Provider,
   SessionMeta,
   SessionMetrics,
 } from "../lib/types";
 
-export type Dialog = null | "new-session" | "settings" | "providers" | "palette" | "search";
+export type Dialog = null | "new-session" | "settings" | "palette" | "search";
 
 interface State {
   ready: boolean;
@@ -41,8 +40,6 @@ interface State {
   init: () => Promise<void>;
   resumeSaved: () => Promise<void>;
   reloadConfig: () => Promise<void>;
-  saveProvider: (p: Provider) => Promise<boolean>;
-  deleteProvider: (id: string) => Promise<void>;
   setActive: (id: string | null) => Promise<void>;
   createSession: (req: CreateSessionRequest) => Promise<SessionMeta | null>;
   closeSession: (id: string, keep?: boolean) => Promise<void>;
@@ -203,28 +200,6 @@ export const useStore = create<State>((set, get) => ({
       get().notify(
         issues > 0 ? `Configuración recargada con ${issues} aviso(s)` : "Configuración recargada",
       );
-    } catch (e) {
-      get().notify(String(e));
-    }
-  },
-
-  async saveProvider(p) {
-    try {
-      const config = await api.providerUpsert(p);
-      set({ config });
-      get().notify(`Proveedor «${p.id}» guardado en providers.toml`);
-      return true;
-    } catch (e) {
-      get().notify(String(e));
-      return false;
-    }
-  },
-
-  async deleteProvider(id) {
-    try {
-      const config = await api.providerRemove(id);
-      set({ config });
-      get().notify(`Proveedor «${id}» eliminado`);
     } catch (e) {
       get().notify(String(e));
     }

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 import { shortPath } from "../lib/format";
-import { providersFor } from "../lib/providers";
 import { useStore } from "../state/store";
 import { IconFolder } from "./Icons";
 
@@ -18,8 +17,6 @@ export function NewSessionDialog() {
   const defaults = config?.app.defaults;
   const [path, setPath] = useState<string>(() => defaults?.cwd ?? home ?? "");
   const [agentId, setAgentId] = useState<string>(defaults?.agent ?? agents[0]?.id ?? "");
-  const [providerId, setProviderId] = useState<string>(defaults?.provider ?? "");
-  const [model, setModel] = useState<string>(defaults?.model ?? "");
   const [title, setTitle] = useState("");
   const [resumeId, setResumeId] = useState<string>("");
   const [continueLast, setContinueLast] = useState(false);
@@ -33,26 +30,6 @@ export function NewSessionDialog() {
   }, []);
 
   const agent = agents.find((a) => a.id === agentId);
-
-  // Recomputed from providers.toml, so a brand new provider shows up here
-  // without restarting the app.
-  const validProviders = useMemo(
-    () => providersFor(config?.providers ?? [], agentId),
-    [config, agentId],
-  );
-
-  // If the chosen provider does not work for the agent, clear it.
-  useEffect(() => {
-    if (providerId && !validProviders.some((p) => p.id === providerId)) setProviderId("");
-  }, [providerId, validProviders]);
-
-  const provider = validProviders.find((p) => p.id === providerId);
-  const models = provider?.model ?? [];
-
-  useEffect(() => {
-    if (!provider) return;
-    if (!models.some((m) => m.id === model)) setModel(provider.default_model ?? models[0]?.id ?? "");
-  }, [provider, models, model]);
 
   const previous = useMemo(
     () =>
@@ -81,8 +58,6 @@ export function NewSessionDialog() {
     const meta = await createSession({
       project_path: path,
       agent_id: agentId,
-      provider_id: providerId || null,
-      model: model || null,
       title: title.trim() || null,
       cwd: path,
       resume_external_id: resumeId || null,
@@ -146,33 +121,6 @@ export function NewSessionDialog() {
               {agent?.path && <div className="hint">{agent.path}</div>}
             </div>
 
-            <div className="field">
-              <label>Proveedor</label>
-              <select value={providerId} onChange={(e) => setProviderId(e.target.value)}>
-                <option value="">(el del propio agente)</option>
-                {validProviders.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name ?? p.id}
-                  </option>
-                ))}
-              </select>
-              <div className="hint">Definidos en providers.toml</div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="field">
-              <label>Modelo</label>
-              <select value={model} onChange={(e) => setModel(e.target.value)} disabled={!provider}>
-                {!provider && <option value="">—</option>}
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name ?? m.id}
-                    {m.context_window ? ` · ${Math.round(m.context_window / 1000)}k` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
             <div className="field">
               <label>Título (opcional)</label>
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Auto" />

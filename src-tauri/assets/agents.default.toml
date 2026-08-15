@@ -1,16 +1,16 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  ~/.sessions/agents.toml — agentes CLI que la app puede lanzar.
 #
-#    id                identificador (se usa como clave en providers.toml:
-#                      [provider.env.<id>] y [provider.args] -> <id> = [...])
+#  El modelo, el proveedor y las claves los gestiona cada CLI en su propia
+#  configuración; aquí solo se declara cómo lanzar el proceso.
+#
+#    id                identificador
 #    command           ejecutable; command_windows / command_macos /
 #                      command_linux permiten overrides por plataforma
 #    args              argumentos base
 #    resume_args       reanudar una sesión concreta; admite {session_id}
 #    continue_args     continuar la última sesión del directorio
-#    model_args        cómo pasar el modelo si el proveedor no lo hace por env;
-#                      admite {model}
-#    [agent.env]       variables fijas (el proveedor puede sobrescribirlas)
+#    [agent.env]       variables fijas del proceso
 #    metrics           claude-jsonl | codex-rollout | opencode-sqlite | none
 #    metrics_path      ruta alternativa del origen de métricas
 #    busy_hints        textos en la salida que indican "trabajando"
@@ -26,7 +26,6 @@ command_windows = "claude.cmd"
 args = []
 resume_args = ["--resume", "{session_id}"]
 continue_args = ["--continue"]
-model_args = ["--model", "{model}"]
 metrics = "claude-jsonl"
 color = "#d97757"
 busy_hints = ["esc to interrupt", "Thinking", "Working"]
@@ -43,7 +42,6 @@ command_windows = "codex.cmd"
 args = []
 resume_args = ["resume", "{session_id}"]
 continue_args = ["resume", "--last"]
-model_args = ["-m", "{model}"]
 metrics = "codex-rollout"
 color = "#10a37f"
 busy_hints = ["Esc to interrupt", "Working", "thinking"]
@@ -59,7 +57,6 @@ command_windows = "opencode.exe"
 args = []
 resume_args = ["--session", "{session_id}"]
 continue_args = ["--continue"]
-model_args = ["--model", "{model}"]
 metrics = "opencode-sqlite"
 color = "#7c93ff"
 busy_hints = ["working", "thinking"]
@@ -68,14 +65,17 @@ busy_hints = ["working", "thinking"]
 FORCE_COLOR = "1"
 
 [[agent]]
-id = "gemini"
-name = "Gemini CLI"
-enabled = false
-command = "gemini"
-command_windows = "gemini.cmd"
-model_args = ["--model", "{model}"]
+id = "pi"
+name = "pi"
+command = "pi"
+args = []
+resume_args = ["--session", "{session_id}"]
+continue_args = ["--continue"]
 metrics = "none"
-color = "#4285f4"
+color = "#c678dd"
+
+[agent.env]
+FORCE_COLOR = "1"
 
 # Terminal normal: útil para git, builds y comandos sueltos junto a los agentes.
 [[agent]]

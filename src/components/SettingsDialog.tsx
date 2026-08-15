@@ -1,17 +1,13 @@
 import { useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 
-import { describeKey, supportsAgent } from "../lib/providers";
-import type { Provider } from "../lib/types";
 import { useStore } from "../state/store";
-import { IconCopy, IconEdit, IconPlus, IconRefresh } from "./Icons";
-import { ProviderEditor } from "./ProviderEditor";
+import { IconRefresh } from "./Icons";
 
-type Tab = "general" | "providers" | "agents" | "performance";
+type Tab = "general" | "agents" | "performance";
 
 const TAB_LABEL: Record<Tab, string> = {
   general: "General",
-  providers: "Proveedores",
   agents: "Agentes",
   performance: "Rendimiento",
 };
@@ -24,8 +20,6 @@ export function SettingsDialog() {
   const platform = useStore((s) => s.platform);
   const reloadConfig = useStore((s) => s.reloadConfig);
   const [tab, setTab] = useState<Tab>("general");
-  // `null` = closed; `{ provider: null }` = creating a new provider.
-  const [editing, setEditing] = useState<{ provider: Provider | null } | null>(null);
 
   if (!config) return null;
   const { paths, issues, app } = config;
@@ -82,15 +76,6 @@ export function SettingsDialog() {
                   </td>
                 </tr>
                 <tr>
-                  <td>providers.toml</td>
-                  <td className="mono">
-                    <button className="chip btn" onClick={() => open(paths.providers)}>
-                      Abrir
-                    </button>{" "}
-                    {paths.providers}
-                  </td>
-                </tr>
-                <tr>
                   <td>agents.toml</td>
                   <td className="mono">
                     <button className="chip btn" onClick={() => open(paths.agents)}>
@@ -127,64 +112,6 @@ export function SettingsDialog() {
             </table>
           )}
 
-          {tab === "providers" && (
-            <>
-              <div className="section">
-                <span>providers.toml · {config.providers.length} proveedores</span>
-                <span className="line" />
-                <button className="chip btn" onClick={() => setEditing({ provider: null })}>
-                  <IconPlus width={12} height={12} /> Nuevo proveedor
-                </button>
-              </div>
-              <div className="hint" style={{ marginBottom: 10 }}>
-                El <b>tipo de API</b> decide qué agentes pueden usar cada proveedor y qué variables
-                reciben; solo hay que bajar al detalle para casos especiales. Al guardar desde aquí se
-                reescribe solo su bloque: los comentarios del fichero se conservan.
-              </div>
-              {config.providers.map((p) => (
-                <div key={p.id} className="card" style={{ cursor: "default" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <b>{p.name ?? p.id}</b>
-                    <span className="badge">{p.kind}</span>
-                    <span className={`badge ${p.enabled ? "ok" : "err"}`}>
-                      {p.enabled ? "activo" : "inactivo"}
-                    </span>
-                    <span className="badge">{p.model.length} modelo(s)</span>
-                    <span style={{ flex: 1 }} />
-                    <button className="icon-btn" title="Editar" onClick={() => setEditing({ provider: p })}>
-                      <IconEdit width={13} height={13} />
-                    </button>
-                    <button
-                      className="icon-btn"
-                      title="Duplicar"
-                      onClick={() =>
-                        setEditing({
-                          provider: {
-                            ...p,
-                            id: `${p.id}-copia`,
-                            name: p.name ? `${p.name} (copia)` : null,
-                          },
-                        })
-                      }
-                    >
-                      <IconCopy width={13} height={13} />
-                    </button>
-                  </div>
-                  <div className="card-sub" style={{ marginTop: 4 }}>
-                    {p.base_url ?? "—"}
-                  </div>
-                  <div className="hint">
-                    clave: {describeKey(p)}
-                    {" · "}
-                    agentes: {p.supported_agents.join(", ") || "ninguno compatible"}
-                    {" · "}
-                    modelo por defecto: {p.default_model ?? "—"}
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-
           {tab === "agents" && (
             <>
               {agents.map((a) => (
@@ -196,10 +123,6 @@ export function SettingsDialog() {
                       {a.installed ? "instalado" : "no encontrado"}
                     </span>
                     {a.metrics && <span className="badge">métricas de tokens</span>}
-                    <span style={{ flex: 1 }} />
-                    <span className="card-sub">
-                      {config.providers.filter((p) => supportsAgent(p, a.id)).length} proveedor(es)
-                    </span>
                   </div>
                   <div className="hint">{a.path ?? "revisa el PATH o ajusta command en agents.toml"}</div>
                 </div>
@@ -233,8 +156,6 @@ export function SettingsDialog() {
           </button>
         </div>
       </div>
-
-      {editing && <ProviderEditor initial={editing.provider} onClose={() => setEditing(null)} />}
     </div>
   );
 }

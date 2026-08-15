@@ -13,7 +13,6 @@ pub const ROOT_DIR: &str = ".sessions";
 pub struct Paths {
     pub root: PathBuf,
     pub config: PathBuf,
-    pub providers: PathBuf,
     pub agents: PathBuf,
     pub state: PathBuf,
     pub scrollback: PathBuf,
@@ -35,7 +34,6 @@ impl Paths {
     pub fn from_root(root: PathBuf) -> Self {
         Self {
             config: root.join("config.toml"),
-            providers: root.join("providers.toml"),
             agents: root.join("agents.toml"),
             state: root.join("state"),
             scrollback: root.join("scrollback"),
@@ -51,7 +49,6 @@ impl Paths {
                 .with_context(|| format!("creando directorio {}", dir.display()))?;
         }
         write_if_absent(&self.config, crate::config::app::DEFAULT_CONFIG_TOML)?;
-        write_if_absent(&self.providers, crate::config::providers::DEFAULT_PROVIDERS_TOML)?;
         write_if_absent(&self.agents, crate::config::agents::DEFAULT_AGENTS_TOML)?;
         Ok(())
     }
@@ -102,7 +99,6 @@ mod tests {
         paths.bootstrap().unwrap();
 
         assert!(paths.config.is_file());
-        assert!(paths.providers.is_file());
         assert!(paths.agents.is_file());
         assert!(paths.scrollback.is_dir());
         assert!(paths.state.is_dir());

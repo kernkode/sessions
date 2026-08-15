@@ -63,11 +63,8 @@ pub struct Agent {
     /// Arguments to continue the last session in the directory.
     #[serde(default)]
     pub continue_args: Vec<String>,
-    /// How to pass the model when the provider does not do it via env (`{model}`).
-    #[serde(default)]
-    pub model_args: Vec<String>,
 
-    /// Fixed agent variables (applied before the provider's).
+    /// Fixed agent variables.
     #[serde(default)]
     pub env: BTreeMap<String, String>,
 
@@ -160,7 +157,7 @@ mod tests {
     fn default_agents_parse() {
         let f: AgentsFile = toml::from_str(DEFAULT_AGENTS_TOML).expect("valid toml");
         let ids: Vec<_> = f.agents.iter().map(|a| a.id.as_str()).collect();
-        for expected in ["claude", "codex", "opencode", "shell"] {
+        for expected in ["claude", "codex", "opencode", "pi", "shell"] {
             assert!(ids.contains(&expected), "missing agent {expected}: {ids:?}");
         }
         let claude = f.agents.iter().find(|a| a.id == "claude").unwrap();
