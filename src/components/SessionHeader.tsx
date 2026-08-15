@@ -59,6 +59,11 @@ export function SessionHeader() {
           {m.model}
         </span>
       )}
+      {m?.effort && (
+        <span className="chip mono" title="Esfuerzo de razonamiento del CLI">
+          {m.effort}
+        </span>
+      )}
       <span className="chip mono" title="Tiempo de sesión">
         {fmtDuration(m?.uptime_ms ?? 0)}
       </span>

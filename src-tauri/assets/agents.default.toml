@@ -11,7 +11,7 @@
 #    resume_args       reanudar una sesión concreta; admite {session_id}
 #    continue_args     continuar la última sesión del directorio
 #    [agent.env]       variables fijas del proceso
-#    metrics           claude-jsonl | codex-rollout | opencode-sqlite | none
+#    metrics           claude-jsonl | codex-rollout | opencode-sqlite | pi-jsonl | none
 #    metrics_path      ruta alternativa del origen de métricas
 #    busy_hints        textos en la salida que indican "trabajando"
 # ─────────────────────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ command = "pi"
 args = []
 resume_args = ["--session", "{session_id}"]
 continue_args = ["--continue"]
-metrics = "none"
+metrics = "pi-jsonl"
 color = "#c678dd"
 
 [agent.env]

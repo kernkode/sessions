@@ -7,6 +7,7 @@
 pub mod claude;
 pub mod codex;
 pub mod opencode;
+pub mod pi;
 pub mod reader;
 pub mod tail;
 pub mod time;
@@ -171,6 +172,22 @@ fn build_reader(spec: &TrackSpec) -> Box<dyn UsageReader> {
                 None => Box::new(NullReader),
             }
         }
+        MetricsSource::PiJsonl => {
+            let base = spec
+                .metrics_path
+                .clone()
+                .map(std::path::PathBuf::from)
+                .or_else(pi::PiReader::base_dir);
+            match base {
+                Some(b) => Box::new(pi::PiReader::new(
+                    b,
+                    &spec.cwd,
+                    spec.external_id.clone(),
+                    since,
+                )),
+                None => Box::new(NullReader),
+            }
+        }
         MetricsSource::None => Box::new(NullReader),
     }
 }
@@ -283,6 +300,7 @@ fn compose(t: &Track, status: SessionStatus, total_bytes: u64, bps: f64, cpu: f3
         total_bytes,
         cost_usd: cost,
         model: u.model.clone(),
+        effort: u.effort.clone(),
         external_id: u.external_id.clone(),
         turns: u.turns,
         uptime_ms: t.spec.pty.uptime_ms(),
@@ -304,6 +322,7 @@ fn is_relevant_change(a: &SessionMetrics, b: &SessionMetrics) -> bool {
         || a.context_used != b.context_used
         || a.context_window != b.context_window
         || a.model != b.model
+        || a.effort != b.effort
         || a.external_id != b.external_id
         || a.turns != b.turns
         || (a.tokens_per_second - b.tokens_per_second).abs() > 0.05

@@ -32,6 +32,8 @@ pub enum MetricsSource {
     CodexRollout,
     /// SQLite `~/.local/share/opencode/opencode.db`
     OpencodeSqlite,
+    /// `~/.pi/agent/sessions/<cwd-slug>/<ts>_<id>.jsonl`
+    PiJsonl,
     /// No telemetry of its own: process metrics and output throughput only.
     #[default]
     None,

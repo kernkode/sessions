@@ -45,6 +45,7 @@ export interface SessionMetrics {
   total_bytes: number;
   cost_usd: number;
   model: string | null;
+  effort: string | null;
   external_id: string | null;
   turns: number;
   uptime_ms: number;

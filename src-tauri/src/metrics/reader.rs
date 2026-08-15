@@ -19,6 +19,8 @@ pub struct Usage {
     /// Window reported by the agent.
     pub context_window: Option<u64>,
     pub model: Option<String>,
+    /// Reasoning effort / thinking level reported by the CLI, if any.
+    pub effort: Option<String>,
     pub turns: u32,
     /// The CLI's own session id, when it can be determined.
     pub external_id: Option<String>,

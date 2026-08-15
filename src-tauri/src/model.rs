@@ -115,6 +115,8 @@ pub struct SessionMetrics {
     /// Cost in USD as reported by the agent.
     pub cost_usd: f64,
     pub model: Option<String>,
+    /// Reasoning effort / thinking level reported by the CLI, if any.
+    pub effort: Option<String>,
     /// Session id in the CLI itself (enables resuming).
     pub external_id: Option<String>,
     pub turns: u32,

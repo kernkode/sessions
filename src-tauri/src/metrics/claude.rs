@@ -108,6 +108,10 @@ impl ClaudeReader {
                     if let Some(m) = v.pointer("/message/model").and_then(Value::as_str) {
                         self.usage.model = Some(m.to_string());
                     }
+                    // Top-level effort of the turn (e.g. "xhigh").
+                    if let Some(e) = v.get("effort").and_then(Value::as_str) {
+                        self.usage.effort = Some(e.to_string());
+                    }
                     if let (Some(t), Some(prev)) = (ts, self.previous_ts) {
                         let duration = (t - prev).max(0) as u64;
                         // Discard huge gaps (the user away between turns).
@@ -196,7 +200,7 @@ pub fn slug_cwd(cwd: &str) -> String {
     cwd.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect()
 }
 
-fn normalize_cwd(cwd: &str) -> String {
+pub(crate) fn normalize_cwd(cwd: &str) -> String {
     cwd.replace('/', "\\").to_lowercase()
 }
 
@@ -213,7 +217,7 @@ fn resolve_project_dir(base: &Path, cwd: &str) -> PathBuf {
     direct
 }
 
-fn newest_file(dir: &Path, since_ms: u64) -> Option<PathBuf> {
+pub(crate) fn newest_file(dir: &Path, since_ms: u64) -> Option<PathBuf> {
     let mut best: Option<(u64, PathBuf)> = None;
     for e in std::fs::read_dir(dir).ok()?.flatten() {
         let p = e.path();
@@ -235,7 +239,7 @@ fn newest_file(dir: &Path, since_ms: u64) -> Option<PathBuf> {
 
 /// Last resort: walk the project directories and compare the `cwd` recorded
 /// inside the JSONL. Only runs when the slug does not match.
-fn find_by_cwd(base: Option<&Path>, cwd_norm: &str, since_ms: u64) -> Option<PathBuf> {
+pub(crate) fn find_by_cwd(base: Option<&Path>, cwd_norm: &str, since_ms: u64) -> Option<PathBuf> {
     let base = base?;
     let mut candidates: Vec<(u64, PathBuf)> = Vec::new();
     for e in std::fs::read_dir(base).ok()?.flatten() {
@@ -328,7 +332,7 @@ mod tests {
 
     fn assistant_line(ts: &str, input: u64, cache_read: u64, output: u64, model: &str) -> String {
         format!(
-            r#"{{"type":"assistant","timestamp":"{ts}","sessionId":"sess-xyz","cwd":"C:\\tmp\\p","message":{{"model":"{model}","usage":{{"input_tokens":{input},"cache_creation_input_tokens":0,"cache_read_input_tokens":{cache_read},"output_tokens":{output},"output_tokens_details":{{"thinking_tokens":7}}}}}}}}"#
+            r#"{{"type":"assistant","timestamp":"{ts}","sessionId":"sess-xyz","cwd":"C:\\tmp\\p","effort":"high","message":{{"model":"{model}","usage":{{"input_tokens":{input},"cache_creation_input_tokens":0,"cache_read_input_tokens":{cache_read},"output_tokens":{output},"output_tokens_details":{{"thinking_tokens":7}}}}}}}}"#
         )
     }
 
@@ -357,6 +361,7 @@ mod tests {
         assert_eq!(u.total_output, 400);
         assert_eq!(u.turns, 1);
         assert_eq!(u.model.as_deref(), Some("claude-opus-5"));
+        assert_eq!(u.effort.as_deref(), Some("high"));
         assert_eq!(u.external_id.as_deref(), Some("sess-xyz"));
         // 400 tokens in 4 s = 100 tok/s.
         assert_eq!(u.last_turn_ms, 4000);
