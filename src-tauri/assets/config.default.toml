@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  ~/.sessions/config.toml — configuración general de Sessions.
+#  Los cambios se aplican con "Recargar configuración" (Ctrl+Shift+R).
+# ─────────────────────────────────────────────────────────────────────────────
+
+[app]
+theme = "dark"
+language = "es"
+# Al abrir la app se vuelven a lanzar las sesiones guardadas. Con los agentes que
+# lo admiten se reanuda su conversación (claude --resume <id>); el resto arrancan
+# de cero en el mismo directorio.
+restore_sessions = true
+auto_resume = "active"      # active (la última usada) | all (todas) | none
+confirm_on_close = true
+persist_scrollback = true
+
+[terminal]
+font_family = "JetBrains Mono, Cascadia Code, Menlo, Consolas, monospace"
+font_size = 13
+line_height = 1.25
+scrollback = 8000
+cursor_blink = true
+cursor_style = "bar"        # bar | block | underline
+renderer = "webgl"          # webgl (rápido) | canvas | dom
+bell = false
+copy_on_select = true
+
+# Pipeline PTY → UI. Estos valores gobiernan el rendimiento real.
+[performance]
+flush_interval_ms = 12      # coalescencia de salida; más alto = menos IPC
+max_chunk_bytes = 32768     # envío inmediato al alcanzar este tamaño
+ring_buffer_kb = 512        # historial por sesión en memoria (rehidratación)
+metrics_poll_ms_active = 300
+metrics_poll_ms_idle = 2000
+max_live_terminals = 4      # instancias xterm vivas (LRU)
+process_sample_ms = 0       # muestreo de CPU/RAM del arbol de procesos; la barra
+                            # de metricas ya no los muestra, y activarlo obliga a
+                            # enumerar todos los procesos en cada ciclo
+
+[defaults]
+agent = "claude"
+provider = "anthropic"
+# model = "claude-sonnet-4-5"
+# cwd = "C:/Users/tu-usuario/proyectos"
+cols = 120
+rows = 32
+
+# Los atajos usan Ctrl+Shift para no pisar los del propio agente
+# (Ctrl+W, Ctrl+R o Ctrl+F llegan intactos al PTY).
+[keybinds]
+new_session = "Ctrl+Shift+T"
+close_session = "Ctrl+Shift+W"
+next_session = "Ctrl+Tab"
+prev_session = "Ctrl+Shift+Tab"
+toggle_sidebar = "Ctrl+Shift+B"
+toggle_metrics = "Ctrl+Shift+M"
+reload_config = "Ctrl+Shift+R"
+clear_terminal = "Ctrl+Shift+K"
+find = "Ctrl+Shift+F"
+settings = "Ctrl+,"
