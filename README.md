@@ -1,9 +1,12 @@
 # Sessions
 
 Consola de escritorio para gestionar varias sesiones de agentes CLI —**Claude Code**,
-**Codex**, **OpenCode**— en una sola ventana, con métricas de tokens en vivo
+**Codex**, **OpenCode**, **pi**— en una sola ventana, con métricas de tokens en vivo
 (tok/s, ventana de contexto, coste) y configuración por TOML en
 `~/.sessions`.
+
+El modelo, el proveedor y las claves los gestiona cada CLI con su propia
+configuración; esta app solo lanza el proceso, lo mantiene vivo y lee su telemetría.
 
 Tauri 2 (Rust) + React. El binario ocupa unos pocos MB y la app arranca en
 ~30 MB de RAM, en lugar de los cientos que consume una alternativa basada en
@@ -18,7 +21,7 @@ Electron.
 | Node 20+ y npm | interfaz (Vite + React) |
 | Rust estable 1.77+ | backend Tauri |
 | WebView2 (Windows) · WebKitGTK (Linux) | motor de la ventana |
-| Los CLIs que quieras usar | `claude`, `codex`, `opencode`… deben estar en el PATH |
+| Los CLIs que quieras usar | `claude`, `codex`, `opencode`, `pi`… deben estar en el PATH |
 
 ## Puesta en marcha
 
@@ -32,8 +35,7 @@ Otros comandos útiles:
 
 ```bash
 npm run build          # comprueba tipos y compila la interfaz
-npm run rs:test        # pruebas del backend (96 en total)
-npm run import:pi      # importa los proveedores de ~/.pi/agent
+npm run rs:test        # pruebas del backend (70 en total)
 npm run icons          # regenera el juego de iconos
 npm run dev:free       # libera el puerto 5273 si quedó un Vite anterior
 ```
@@ -57,11 +59,11 @@ sessions/
 │  ├─ src/pty/              PTY, buffer circular y bomba de salida
 │  ├─ src/metrics/          lectores de tokens por agente
 │  ├─ src/config/           carga y validación de los TOML
-│  ├─ src/launcher.rs       agente + proveedor → comando y entorno
+│  ├─ src/launcher.rs       agente → comando, argumentos y entorno
 │  ├─ src/store.rs          proyectos, sesiones y scrollback
 │  ├─ src/commands.rs       API expuesta a la interfaz
 │  └─ assets/*.default.toml plantillas que se copian a ~/.sessions
-└─ scripts/                 iconos, importador de pi, sondas de interfaz y utilidades
+└─ scripts/                 iconos, sondas de interfaz y utilidades
 ```
 
 ---
@@ -73,7 +75,6 @@ Se crea en el primer arranque y **no se sobrescribe** después:
 ```
 ~/.sessions/
 ├─ config.toml           apariencia, terminal, rendimiento, reanudación, atajos
-├─ providers.toml        proveedores, modelos, precios y mapeo por agente
 ├─ agents.toml           CLIs que la app puede lanzar
 ├─ state/projects.json   proyectos y sesiones registradas
 ├─ scrollback/           historial por sesión
@@ -87,146 +88,45 @@ Tras editar cualquier `.toml`, aplica los cambios con **Ctrl+Shift+R** o el bot�
 *Recargar* de Ajustes. Un fichero con errores no impide arrancar: la app avisa del
 problema y usa los valores de fábrica.
 
-### Proveedores compatibles con distintos entornos
+### Proveedores, modelos y claves
 
-Se editan desde **Ajustes → Proveedores** (alta, edición, duplicado y borrado) o a
-mano en el fichero. En el caso normal basta con esto:
-
-```toml
-[[provider]]
-id = "mi-gateway"
-kind = "openai-chat"          # decide qué CLI puede usarlo
-base_url = "https://gateway.interno.local/v1"
-api_key_env = "MI_API_KEY"
-default_model = "modelo-a"
-
-[[provider.model]]
-id = "modelo-a"
-context_window = 128000
-max_output_tokens = 16384
-```
-
-El `kind` es lo que hace el trabajo: la app ya sabe qué variables y argumentos
-espera cada CLI y los deriva sola.
-
-| `kind` | Agentes que lo pueden usar | Qué inyecta |
-|---|---|---|
-| `anthropic` | Claude Code, OpenCode | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_MODEL`, `API_TIMEOUT_MS`… |
-| `openai-chat` | Codex | `<ID>_API_KEY` y los overrides `-c model_providers.<id>.… wire_api=chat` |
-| `openai-responses` | Codex, OpenCode | igual, con `wire_api=responses` |
-| `google` | Gemini CLI, OpenCode | `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` |
-| `ollama` | Codex | endpoint local compatible con OpenAI |
-
-La clave se escribe **directamente en el editor, debajo de la URL base** (campo
-enmascarado con botón para verla). El desplegable a su derecha permite cambiar el
-origen sin mover el campo de sitio: variable del entorno, **fichero** (texto o JSON
-con `api_key_json_path`, p. ej. `gorouter.key`), **comando** (`op`, `pass`,
-`gopass`…) o sin clave. Solo se guarda uno de los cuatro: al cambiar de origen se
-limpian los demás campos.
-
-El botón **Comprobar** del editor resuelve la clave de verdad y enseña, agente por
-agente, las variables y argumentos exactos que recibirá el proceso, con el secreto
-enmascarado. Es la forma rápida de ver por qué un proveedor no aparece para un CLI.
-
-Al guardar desde la app se reescribe únicamente el bloque `[[provider]]` afectado:
-los comentarios y el resto del fichero se conservan (`toml_edit`), incluso al
-borrar un proveedor. Antes de escribir se valida el identificador, que no haya
-modelos repetidos y que los modelos por defecto existan.
+No los gestiona esta app: los configura cada CLI donde ya lo hacía
+(`claude`, `codex`, `opencode`, `pi` tienen sus propios ajustes y su propio
+almacén de credenciales). Por eso `agents.toml` solo describe **cómo lanzar el
+proceso**: ejecutable, argumentos y variables de entorno fijas. Si necesitas
+apuntar un CLI a un *gateway* propio, hazlo con su configuración o con
+`[agent.env]`.
 
 #### Cuando hace falta bajar al detalle
 
-`[provider.env.<agente>]` y `[provider.args]` siguen ahí para añadir o corregir
-cosas puntuales. Lo que escribas gana sobre la plantilla, y una variable con valor
-vacío (`""`) anula la heredada. Ejemplo real: DeepSeek expone además un endpoint
-compatible con Anthropic, así que también vale para Claude Code:
-
-```toml
-[provider.env.claude]
-ANTHROPIC_BASE_URL = "{base_url}/anthropic"
-ANTHROPIC_AUTH_TOKEN = "{api_key}"
-ANTHROPIC_MODEL = "{model}"
-```
-
-```toml
-[[provider]]
-id = "openrouter"
-name = "OpenRouter"
-kind = "openai-chat"                   # → Codex, con los overrides -c automáticos
-base_url = "https://openrouter.ai/api/v1"
-api_key_env = "OPENROUTER_API_KEY"     # o api_key / api_key_file / api_key_command
-default_model = "anthropic/claude-sonnet-4.5"
-
-[[provider.model]]
-id = "anthropic/claude-sonnet-4.5"
-context_window = 200000
-max_output_tokens = 64000
-reasoning = true
-[provider.model.pricing]               # USD por millón de tokens
-input = 3.0
-output = 15.0
-
-[provider.env.opencode]                # OpenCode trae OpenRouter integrado
-OPENROUTER_API_KEY = "{api_key}"
-
-[provider.args]
-opencode = ["--model", "openrouter/{model}"]
-```
-
-Plantillas disponibles: `{base_url}` `{api_key}` `{model}` `{model_id}`
-`{context_window}` `{max_output_tokens}` `{small_model}` `{organization}`
-`{project}` `{region}` `{api_version}` `{timeout_ms}` `{max_retries}`
-`{provider_id}` `{provider_name}` `{env_var}` `{home}`. `{{` y `}}` escapan llaves.
-Si una plantilla no se puede resolver (por ejemplo falta la clave), esa variable
-**no se pasa** al proceso, en lugar de propagar un literal roto.
-
-La clave se resuelve en este orden: `api_key` literal → `api_key_file`
-(+ `api_key_json_path`) → `api_key_command` → `api_key_env`. Lo recomendable es no
-escribir claves en el fichero.
-
-De fábrica vienen Anthropic, OpenAI, Google, OpenRouter, DeepSeek, Ollama y una
-plantilla de *gateway* propio.
-
-### Importar los proveedores de pi
-
-Si ya usas [pi](https://github.com/earendil-works) hay un importador que lee
-`~/.pi/agent/models.json`, `models-store.json` y `auth.json`:
-
-```bash
-npm run import:pi -- --dry     # enseña lo que haría
-npm run import:pi              # escribe en ~/.sessions/providers.toml
-npm run import:pi -- --incluir-openai
-```
-
-Qué hace:
-
-* Traduce `anthropic-messages` → `kind = "anthropic"` (Claude Code) y
-  `openai-completions` → `kind = "openai-chat"` (Codex). El mapeo de variables no
-  se escribe: lo deduce la app del `kind`, así que los bloques importados son
-  cortos y legibles.
-* Copia modelos con su ventana de contexto, límite de salida y precios.
-* **No copia las claves**: apunta `api_key_file` a `~/.pi/agent/auth.json` con
-  `api_key_json_path = "<proveedor>.key"`, y se leen al lanzar la sesión.
-* Es idempotente: reemplaza por `id` los bloques de una importación anterior y no
-  toca el resto del fichero. Si editas un proveedor importado desde la app, una
-  reimportación lo sobrescribe.
+`[agent.env]` es la vía para variables fijas del proceso (`FORCE_COLOR`, un
+`ANTHROPIC_BASE_URL` que apunte a tu *gateway*, un token que ya tengas en el
+entorno). Y `extra_args` de la petición añade argumentos sueltos a un lanzamiento
+concreto sin tocar el fichero.
 
 ### Agentes
 
 ```toml
 [[agent]]
-id = "claude"                       # este id es la clave en [provider.env.<id>]
+id = "claude"
 name = "Claude Code"
 command = "claude"
 command_windows = "claude.cmd"      # los shims de npm en Windows son .cmd
 resume_args = ["--resume", "{session_id}"]
 continue_args = ["--continue"]
-model_args = ["--model", "{model}"]
 metrics = "claude-jsonl"            # de dónde salen los tokens
+
+[agent.env]
+FORCE_COLOR = "1"
 ```
 
 `metrics` admite `claude-jsonl`, `codex-rollout`, `opencode-sqlite` o `none`.
-Añadir un CLI nuevo es solo otro bloque `[[agent]]`; si no publica telemetría,
-la app sigue mostrando su actividad y el rendimiento de salida.
+Añadir un CLI nuevo es solo otro bloque `[[agent]]`; si no publica telemetría
+—como `pi` ahora mismo—, la app sigue mostrando su actividad y el rendimiento de
+salida. De fábrica vienen Claude Code, Codex, OpenCode, pi y una terminal normal
+para git, builds y comandos sueltos.
+
+`enabled = false` mantiene un bloque en el fichero sin ofrecerlo en la interfaz.
 
 ---
 
@@ -239,15 +139,16 @@ No se estiman: se leen del propio registro de cada agente.
 | Claude Code | `~/.claude/projects/<cwd>/<id>.jsonl` | `message.usage` por turno (entrada, salida, caché, *thinking*), modelo |
 | Codex | `~/.codex/sessions/AAAA/MM/DD/rollout-*.jsonl` | eventos `token_count`, `model_context_window`, modelo del turno |
 | OpenCode | `~/.local/share/opencode/opencode.db` (solo lectura) | acumulados de la tabla `session`, coste |
+| pi, terminal | — | actividad y bytes/s del PTY |
 
 Los ficheros se leen de forma incremental por desplazamiento, nunca completos, y
 el sondeo se adapta: rápido mientras la sesión produce salida, lento en reposo.
 
 * **tok/s** — tokens de salida del último turno entre su duración, suavizado con
   media móvil. Se muestra también el pico.
-* **Ventana de contexto** — la que reporte el agente; si no la reporta, la
-  declarada en `providers.toml` para ese modelo.
-* **Coste** — el que informe el agente o el calculado con `[provider.model.pricing]`.
+* **Ventana de contexto** y **modelo** — los que reporte el agente; si no los
+  reporta, no se muestran.
+* **Coste** — el que informe el agente.
 * **Bytes/s de salida del PTY** — señal de actividad válida incluso con agentes sin
   telemetría propia.
 
@@ -261,8 +162,7 @@ máquina en cada ciclo.
 Los procesos no sobreviven al cierre, así que al arrancar la app vuelve a lanzar
 las sesiones guardadas por su cuenta: con los agentes que lo admiten reanuda la
 conversación (`claude --resume <id>`, `codex resume <id>`) y el resto arrancan de
-cero en el mismo directorio, con su mismo proveedor y modelo. No hay que pulsar
-nada.
+cero en el mismo directorio. No hay que pulsar nada.
 
 ```toml
 [app]
@@ -373,15 +273,14 @@ Se usan combinaciones con Shift a propósito: `Ctrl+C`, `Ctrl+R`, `Ctrl+W` o
 ## Pruebas
 
 ```bash
-npm run rs:test     # 92 unitarias + 4 de extremo a extremo
+npm run rs:test     # 66 unitarias + 4 de extremo a extremo
 npm run build       # tipos + interfaz
 ```
 
-Cubren el parseo de los TOML de fábrica, la resolución de proveedores por agente,
-la edición de `providers.toml` conservando comentarios, el buffer circular, el
-ciclo de vida del PTY (incluidos el diálogo DSR de ConPTY y la detección de fin sin
-EOF), la coalescencia de salida, los tres lectores de métricas, la persistencia y
-la recarga en caliente.
+Cubren el parseo de los TOML de fábrica, la construcción del comando y el entorno
+de cada agente, el buffer circular, el ciclo de vida del PTY (incluidos el diálogo
+DSR de ConPTY y la detección de fin sin EOF), la coalescencia de salida, los tres
+lectores de métricas, la persistencia y la recarga en caliente.
 
 Para inspeccionar o automatizar la interfaz real dentro de WebView2:
 
@@ -392,7 +291,6 @@ WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 \
 node scripts/ui-probe.mjs "document.body.innerText"
 node scripts/ui-probe.mjs --type $'echo hola\r'
 node scripts/ui-shot.mjs captura.png
-node scripts/ui-test-provider.mjs gorouter 300000   # edita y guarda un proveedor
 ```
 
 ---
@@ -438,11 +336,10 @@ una sesión viva; la app no lo hace, pero si tocas `max_live_terminals` déjalo 
 
 ## Seguridad
 
-* Las claves de API no se escriben en el disco por la app: se leen del entorno o
-  de un gestor de secretos mediante `api_key_command`. Si las pones en
-  `providers.toml`, ese fichero queda en tu carpeta de usuario.
-* `providers.toml` y `agents.toml` **ejecutan procesos y definen su entorno**:
-  trátalos como código y no cargues ficheros de terceros sin revisarlos.
+* La app no gestiona claves de API: cada CLI usa las suyas. Si pones un token en
+  `[agent.env]`, ese valor queda en `agents.toml`, en tu carpeta de usuario.
+* `agents.toml` **ejecuta procesos y define su entorno**: trátalo como código y no
+  cargues ficheros de terceros sin revisarlos.
 * La base de datos de OpenCode se abre siempre en modo solo lectura.
 * La ventana usa CSP restrictiva y solo se conceden los permisos de Tauri que la
   app necesita (diálogo de carpetas, abrir rutas y control de la ventana).
