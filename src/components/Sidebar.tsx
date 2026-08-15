@@ -1,0 +1,172 @@
+import { useMemo, useState } from "react";
+
+import { fmtRate, shortId, shortPath } from "../lib/format";
+import type { SessionMeta } from "../lib/types";
+import { useStore } from "../state/store";
+import { IconBranch, IconChevron, IconPlus, IconTrash } from "./Icons";
+
+export function Sidebar() {
+  const projects = useStore((s) => s.projects);
+  const sessions = useStore((s) => s.sessions);
+  const activeId = useStore((s) => s.activeId);
+  const setActive = useStore((s) => s.setActive);
+  const toggleProject = useStore((s) => s.toggleProject);
+  const removeProject = useStore((s) => s.removeProject);
+  const setDialog = useStore((s) => s.setDialog);
+  const [filter, setFilter] = useState("");
+  // Removing a project takes its sessions with it: confirm in place.
+  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
+
+  const groups = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    const matches = (s: SessionMeta) =>
+      !q ||
+      s.title.toLowerCase().includes(q) ||
+      s.agent_id.toLowerCase().includes(q) ||
+      (s.external_id ?? "").toLowerCase().includes(q);
+
+    const byProject = new Map<string, SessionMeta[]>();
+    for (const s of sessions) {
+      if (!matches(s)) continue;
+      const list = byProject.get(s.project_id) ?? [];
+      list.push(s);
+      byProject.set(s.project_id, list);
+    }
+    // Projects with the most recent activity first.
+    return projects
+      .map((p) => ({
+        project: p,
+        list: (byProject.get(p.id) ?? []).sort((a, b) => b.created_at - a.created_at),
+      }))
+      .filter((g) => !q || g.list.length > 0)
+      .sort(
+        (a, b) =>
+          (b.list[0]?.created_at ?? b.project.created_at) -
+          (a.list[0]?.created_at ?? a.project.created_at),
+      );
+  }, [projects, sessions, filter]);
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-top">
+        <input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filtrar sesiones…"
+          spellCheck={false}
+        />
+        <button className="icon-btn" title="Añadir proyecto" onClick={() => setDialog("new-session")}>
+          <IconPlus />
+        </button>
+      </div>
+
+      <div className="sidebar-list">
+        {groups.length === 0 && (
+          <div className="hint" style={{ padding: "10px 6px" }}>
+            Sin proyectos todavía. Crea una sesión para empezar.
+          </div>
+        )}
+
+        {groups.map(({ project, list }) => (
+          <div key={project.id}>
+            <div className="group-head" title={project.path}>
+              <button
+                onClick={() => void toggleProject(project.id)}
+                style={{ display: "grid", placeItems: "center", opacity: 1 }}
+                title={project.collapsed ? "Expandir" : "Plegar"}
+              >
+                <IconChevron open={!project.collapsed} width={13} height={13} />
+              </button>
+              <span className="name">{project.name}</span>
+              <button
+                title="Nueva sesión en este proyecto"
+                onClick={() => {
+                  useStore.setState({ dialog: "new-session" });
+                  window.dispatchEvent(
+                    new CustomEvent("sessions:preset-project", { detail: project.path }),
+                  );
+                }}
+              >
+                <IconPlus width={13} height={13} />
+              </button>
+              <button title="Quitar proyecto y sus sesiones" onClick={() => setPendingRemoval(project.id)}>
+                <IconTrash width={13} height={13} />
+              </button>
+            </div>
+
+            {pendingRemoval === project.id && (
+              <div className="confirm-row">
+                <span>
+                  Quitar «{project.name}» y sus {list.length} sesión(es)
+                </span>
+                <button className="chip btn" onClick={() => setPendingRemoval(null)}>
+                  No
+                </button>
+                <button
+                  className="chip btn danger"
+                  onClick={() => {
+                    setPendingRemoval(null);
+                    void removeProject(project.id);
+                  }}
+                >
+                  Sí
+                </button>
+              </div>
+            )}
+
+            {!project.collapsed &&
+              list.map((s) => (
+                <SessionCard key={s.id} s={s} on={s.id === activeId} onClick={() => void setActive(s.id)} />
+              ))}
+
+            {!project.collapsed && list.length === 0 && (
+              <div className="hint" style={{ padding: "0 6px 8px" }}>
+                {shortPath(project.path, 34)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function SessionCard({ s, on, onClick }: { s: SessionMeta; on: boolean; onClick: () => void }) {
+  // Narrow subscription: only this card repaints when its metrics change.
+  const m = useStore((st) => st.metrics[s.id]);
+  const status = m?.status ?? s.status;
+  const label =
+    status === "working"
+      ? "Trabajando"
+      : status === "idle"
+        ? "En espera"
+        : status === "error"
+          ? "Error"
+          : "Terminada";
+
+  return (
+    <div className={`card ${on ? "on" : ""}`} onClick={onClick} title={s.command_line ?? s.title}>
+      <div className="card-title">{s.title}</div>
+      <div className="card-sub">
+        {s.external_id ? (
+          <>
+            <IconBranch width={11} height={11} />
+            <span className="ext">{shortId(s.external_id, 18)}</span>
+          </>
+        ) : (
+          <span className="ext">
+            {s.agent_id}
+            {s.pid ? ` · pid ${s.pid}` : ""}
+          </span>
+        )}
+      </div>
+      <div className={`card-state ${status}`}>
+        <span className={`dot ${status}`} />
+        {label}
+        {m && m.tokens_per_second > 0 && (
+          <span className="card-tps">{fmtRate(m.tokens_per_second)} tok/s</span>
+        )}
+      </div>
+    </div>
+  );
+}
