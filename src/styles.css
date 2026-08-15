@@ -886,3 +886,251 @@ table.info td.mono {
 .mono {
   font-family: var(--font-mono);
 }
+
+/* ───────── Diálogo de ajustes ───────── */
+
+/* Ajustes usa navegación lateral en vez de pestañas: raíl fijo a la izquierda
+   y contenido con scroll propio a la derecha. */
+.dialog.settings {
+  width: min(880px, calc(100vw - 48px));
+  height: min(580px, calc(100vh - 64px));
+}
+
+.settings-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.settings-nav {
+  width: 176px;
+  min-width: 176px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+}
+
+.snav {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--txt-2);
+  font-weight: 500;
+  text-align: left;
+}
+
+.snav svg {
+  color: var(--txt-3);
+  flex: none;
+}
+
+.snav:hover {
+  background: var(--bg-3);
+  color: var(--txt);
+}
+
+.snav.on {
+  background: var(--bg-4);
+  color: var(--txt);
+}
+
+/* El icono del ítem activo toma el acento coral. */
+.snav.on svg {
+  color: var(--acc-2);
+}
+
+/* Contador pequeño a la derecha del ítem (nº de agentes). */
+.snav .n {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-3);
+  color: var(--txt-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.settings-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 16px 18px 22px;
+}
+
+/* Secciones con título en pequeño y grupo de filas con borde, estilo inspector. */
+.set-section {
+  margin-bottom: 20px;
+}
+
+.set-section > h3 {
+  margin: 0 0 7px 2px;
+  color: var(--txt-3);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.set-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-3);
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.set-row:last-child {
+  border-bottom: none;
+}
+
+.set-row .lab {
+  flex: 1;
+  min-width: 0;
+}
+
+.set-row .name {
+  font-weight: 550;
+}
+
+/* Clave real de config.toml en mono (pestaña Rendimiento). */
+.set-row .mono-key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--txt-2);
+}
+
+.set-row .desc {
+  margin-top: 2px;
+  color: var(--txt-3);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.set-row .val {
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--txt);
+  user-select: text;
+}
+
+/* Atajos: cada tecla se dibuja como un kbd físico. */
+.keys {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--txt);
+  background: var(--bg-4);
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.kbd-sep {
+  margin: 0 3px;
+  color: var(--txt-3);
+  font-size: 10.5px;
+}
+
+/* Agentes: tarjeta con mosaico teñido del color del agente. */
+.agents-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.agents-head .hint {
+  flex: 1;
+  margin: 0;
+}
+
+.agent {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-3);
+}
+
+/* Mosaico con la inicial; --c llega en línea con el color del agente. */
+.agent-tile {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c, var(--txt-3));
+  background: color-mix(in srgb, var(--c, var(--txt-3)) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c, var(--txt-3)) 34%, transparent);
+}
+
+.agent-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.agent-top b {
+  font-size: 12.5px;
+}
+
+.agent-path {
+  margin-top: 3px;
+  color: var(--txt-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.agent-path.missing {
+  color: var(--warn);
+}
+
+/* Versión y plataforma a la izquierda del pie del diálogo. */
+.dialog-foot .foot-meta {
+  margin-right: auto;
+  align-self: center;
+  color: var(--txt-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
