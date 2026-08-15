@@ -66,18 +66,18 @@ export function SessionHeader() {
       <div className="sep" />
 
       <button
-        className="chip btn"
+        className="icon-btn"
         title="Buscar en el terminal (Ctrl+Shift+F)"
         onClick={() => setDialog("search")}
       >
-        <IconSearch width={13} height={13} />
+        <IconSearch />
       </button>
       <button
-        className="chip btn"
+        className="icon-btn"
         title="Limpiar terminal (Ctrl+Shift+K)"
         onClick={() => void clearTerminal(session.id)}
       >
-        <IconTerminal width={13} height={13} />
+        <IconTerminal />
       </button>
       {live ? (
         <button
@@ -108,11 +108,11 @@ export function SessionHeader() {
         </>
       )}
       <button
-        className="chip btn danger"
+        className="icon-btn danger"
         title="Cerrar y quitar de la lista"
         onClick={() => void closeSession(session.id, false)}
       >
-        <IconTrash width={13} height={13} />
+        <IconTrash />
       </button>
     </div>
   );

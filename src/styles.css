@@ -175,6 +175,12 @@ select:focus {
   background: var(--acc-2);
 }
 
+/* Variante peligrosa: rojo de error al pasar el ratón. */
+.icon-btn.danger:hover {
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+  color: var(--err);
+}
+
 .win-btns {
   display: flex;
   gap: 2px;
@@ -256,10 +262,10 @@ select:focus {
 
 .chip.danger {
   color: var(--err);
-  border-color: #4a2621;
+  border-color: color-mix(in srgb, var(--err) 32%, transparent);
 }
 .chip.danger:hover {
-  background: #2a1714;
+  background: color-mix(in srgb, var(--err) 12%, transparent);
 }
 
 .dot {
@@ -271,7 +277,7 @@ select:focus {
 }
 .dot.working {
   background: var(--acc);
-  box-shadow: 0 0 0 3px rgba(232, 102, 61, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 18%, transparent);
   animation: pulse 1.4s ease-in-out infinite;
 }
 .dot.idle {
@@ -315,10 +321,27 @@ select:focus {
   padding: 8px 8px 6px;
 }
 
+/* Caja de filtro con la lupa dentro. */
+.sidebar-search {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.sidebar-search svg {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--txt-3);
+  pointer-events: none;
+}
+
 .sidebar-top input {
   flex: 1;
   height: 26px;
-  padding: 0 8px;
+  padding: 0 8px 0 26px;
   font-size: 12px;
 }
 
@@ -359,6 +382,9 @@ select:focus {
 }
 
 .card {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
   border: 1px solid var(--line);
   background: var(--bg-3);
   border-radius: var(--radius);
@@ -371,9 +397,31 @@ select:focus {
   border-color: var(--line-2);
 }
 
+/* La tarjeta activa se tiñe del acento en vez de usar hex fijos. */
 .card.on {
-  background: #241a16;
-  border-color: #7a3a26;
+  background: color-mix(in srgb, var(--acc) 9%, var(--bg-3));
+  border-color: color-mix(in srgb, var(--acc) 42%, var(--line));
+}
+
+/* Mosaico con la inicial del agente, teñido de su color (--c en línea). */
+.card-tile {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--c, var(--txt-3));
+  background: color-mix(in srgb, var(--c, var(--txt-3)) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c, var(--txt-3)) 32%, transparent);
+}
+
+.card-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .card-title {
@@ -426,8 +474,8 @@ select:focus {
   gap: 6px;
   padding: 6px 7px;
   margin: 0 0 6px;
-  border: 1px solid #4a3a21;
-  background: #241d12;
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
   border-radius: var(--radius-sm);
   color: var(--warn);
   font-size: 11px;
@@ -510,14 +558,36 @@ main {
   font-size: 16px;
 }
 
-.empty kbd {
-  font-family: var(--font-mono);
-  background: var(--bg-3);
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  padding: 1px 5px;
+/* Marca grande del estado vacío y rejilla de atajos con kbd. */
+.empty-mark {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--acc) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acc) 35%, transparent);
+  color: var(--acc-2);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.empty-keys {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 9px 22px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.empty-key {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-size: 11px;
+  color: var(--txt-3);
+  white-space: nowrap;
 }
 
 .btn {
@@ -602,6 +672,19 @@ main {
   display: flex;
   align-items: center;
   gap: 7px;
+}
+
+.gauge .k {
+  color: var(--txt-3);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gauge .v {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--txt);
 }
 
 .gauge-bar {
@@ -757,7 +840,7 @@ select.mini {
   background: var(--bg-3);
 }
 .pick.on {
-  background: #241a16;
+  background: color-mix(in srgb, var(--acc) 10%, var(--bg-2));
 }
 
 .pick .path {
@@ -781,11 +864,11 @@ select.mini {
 
 .badge.ok {
   color: var(--ok);
-  border-color: #23482f;
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
 }
 .badge.err {
   color: var(--err);
-  border-color: #4a2621;
+  border-color: color-mix(in srgb, var(--err) 32%, transparent);
 }
 
 table.info {
@@ -813,8 +896,8 @@ table.info td.mono {
 }
 
 .issue {
-  border: 1px solid #4a3a21;
-  background: #241d12;
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
   color: var(--warn);
   border-radius: var(--radius-sm);
   padding: 8px 10px;

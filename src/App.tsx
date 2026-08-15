@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 
 import { MetricsBar } from "./components/MetricsBar";
 import { NewSessionDialog } from "./components/NewSessionDialog";
@@ -7,7 +7,7 @@ import { SessionHeader } from "./components/SessionHeader";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
-import { IconPlay, IconRefresh } from "./components/Icons";
+import { IconPlay, IconPlus, IconRefresh } from "./components/Icons";
 import { pool } from "./term/pool";
 import { selActiveSession, useStore } from "./state/store";
 
@@ -168,23 +168,41 @@ function EndedBanner() {
   );
 }
 
+const EMPTY_KEYS: [string, string[]][] = [
+  ["Nueva sesión", ["Ctrl", "Shift", "T"]],
+  ["Cambiar de sesión", ["Ctrl", "Tab"]],
+  ["Panel lateral", ["Ctrl", "Shift", "B"]],
+  ["Recargar configuración", ["Ctrl", "Shift", "R"]],
+];
+
 function EmptyState() {
   const setDialog = useStore((s) => s.setDialog);
   return (
     <div className="empty">
       <div>
+        <span className="empty-mark">›</span>
         <h2>Sin sesiones abiertas</h2>
         <p>Lanza Claude Code, Codex, OpenCode o una terminal y sigue sus tokens en tiempo real.</p>
         <p style={{ marginTop: 18 }}>
           <button className="btn primary" onClick={() => setDialog("new-session")}>
-            Nueva sesión
+            <IconPlus width={13} height={13} /> Nueva sesión
           </button>
         </p>
-        <p className="hint" style={{ marginTop: 16 }}>
-          <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> nueva · <kbd>Ctrl</kbd>+<kbd>Tab</kbd> cambiar
-          · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> panel · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+
-          <kbd>R</kbd> recargar configuración
-        </p>
+        <div className="empty-keys">
+          {EMPTY_KEYS.map(([label, combo]) => (
+            <span key={label} className="empty-key">
+              <span className="keys">
+                {combo.map((k, i) => (
+                  <Fragment key={i}>
+                    {i > 0 && <span className="kbd-sep">+</span>}
+                    <kbd className="kbd">{k}</kbd>
+                  </Fragment>
+                ))}
+              </span>
+              {label}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

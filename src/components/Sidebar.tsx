@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 
 import { fmtRate, shortId, shortPath } from "../lib/format";
 import type { SessionMeta } from "../lib/types";
 import { useStore } from "../state/store";
-import { IconBranch, IconChevron, IconPlus, IconTrash } from "./Icons";
+import { IconBranch, IconChevron, IconPlus, IconSearch, IconTrash } from "./Icons";
 
 export function Sidebar() {
   const projects = useStore((s) => s.projects);
@@ -49,12 +50,15 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
-        <input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filtrar sesiones…"
-          spellCheck={false}
-        />
+        <div className="sidebar-search">
+          <IconSearch width={13} height={13} />
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filtrar sesiones…"
+            spellCheck={false}
+          />
+        </div>
         <button className="icon-btn" title="Añadir proyecto" onClick={() => setDialog("new-session")}>
           <IconPlus />
         </button>
@@ -134,6 +138,7 @@ export function Sidebar() {
 function SessionCard({ s, on, onClick }: { s: SessionMeta; on: boolean; onClick: () => void }) {
   // Narrow subscription: only this card repaints when its metrics change.
   const m = useStore((st) => st.metrics[s.id]);
+  const agent = useStore((st) => st.agents.find((a) => a.id === s.agent_id));
   const status = m?.status ?? s.status;
   const label =
     status === "working"
@@ -146,26 +151,31 @@ function SessionCard({ s, on, onClick }: { s: SessionMeta; on: boolean; onClick:
 
   return (
     <div className={`card ${on ? "on" : ""}`} onClick={onClick} title={s.command_line ?? s.title}>
-      <div className="card-title">{s.title}</div>
-      <div className="card-sub">
-        {s.external_id ? (
-          <>
-            <IconBranch width={11} height={11} />
-            <span className="ext">{shortId(s.external_id, 18)}</span>
-          </>
-        ) : (
-          <span className="ext">
-            {s.agent_id}
-            {s.pid ? ` · pid ${s.pid}` : ""}
-          </span>
-        )}
-      </div>
-      <div className={`card-state ${status}`}>
-        <span className={`dot ${status}`} />
-        {label}
-        {m && m.tokens_per_second > 0 && (
-          <span className="card-tps">{fmtRate(m.tokens_per_second)} tok/s</span>
-        )}
+      <span className="card-tile" style={{ "--c": agent?.color } as CSSProperties}>
+        {(agent?.name ?? s.agent_id).charAt(0).toUpperCase()}
+      </span>
+      <div className="card-body">
+        <div className="card-title">{s.title}</div>
+        <div className="card-sub">
+          {s.external_id ? (
+            <>
+              <IconBranch width={11} height={11} />
+              <span className="ext">{shortId(s.external_id, 18)}</span>
+            </>
+          ) : (
+            <span className="ext">
+              {s.agent_id}
+              {s.pid ? ` · pid ${s.pid}` : ""}
+            </span>
+          )}
+        </div>
+        <div className={`card-state ${status}`}>
+          <span className={`dot ${status}`} />
+          {label}
+          {m && m.tokens_per_second > 0 && (
+            <span className="card-tps">{fmtRate(m.tokens_per_second)} tok/s</span>
+          )}
+        </div>
       </div>
     </div>
   );

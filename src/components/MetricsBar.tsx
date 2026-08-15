@@ -38,13 +38,11 @@ export function MetricsBar() {
           window ? `${used} de ${window} tokens de contexto` : "Ventana de contexto desconocida"
         }
       >
-        <span className="k" style={{ color: "var(--txt-3)", fontSize: 10.5, textTransform: "uppercase" }}>
-          contexto
-        </span>
+        <span className="k">contexto</span>
         <div className="gauge-bar">
           <div className={`gauge-fill ${level}`} style={{ width: `${pct ?? 0}%` }} />
         </div>
-        <span className="v" style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>
+        <span className="v">
           {fmtTokens(used)}
           {window ? ` / ${fmtTokens(window)}` : ""}
           {pct !== null ? ` · ${pct.toFixed(0)}%` : ""}
