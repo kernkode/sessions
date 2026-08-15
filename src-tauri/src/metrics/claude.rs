@@ -73,40 +73,47 @@ impl ClaudeReader {
         let ts = v.get("timestamp").and_then(Value::as_str).and_then(parse_iso8601_ms);
 
         if v.get("type").and_then(Value::as_str) == Some("assistant") {
-            if let Some(u) = v.pointer("/message/usage") {
-                let g = |k: &str| u.get(k).and_then(Value::as_u64).unwrap_or(0);
-                let input = g("input_tokens");
-                let output = g("output_tokens");
-                let cache_read = g("cache_read_input_tokens");
-                let cache_write = g("cache_creation_input_tokens");
-                let reasoning = u
-                    .pointer("/output_tokens_details/thinking_tokens")
-                    .and_then(Value::as_u64)
-                    .unwrap_or(0);
+            // Claude Code appends "synthetic" entries (interrupts, local
+            // notices) with model "<synthetic>" and zero usage; adopting them
+            // would overwrite the real model and zero the context window.
+            let synthetic =
+                v.pointer("/message/model").and_then(Value::as_str) == Some("<synthetic>");
+            if !synthetic {
+                if let Some(u) = v.pointer("/message/usage") {
+                    let g = |k: &str| u.get(k).and_then(Value::as_u64).unwrap_or(0);
+                    let input = g("input_tokens");
+                    let output = g("output_tokens");
+                    let cache_read = g("cache_read_input_tokens");
+                    let cache_write = g("cache_creation_input_tokens");
+                    let reasoning = u
+                        .pointer("/output_tokens_details/thinking_tokens")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0);
 
-                self.usage.input = input;
-                self.usage.output = output;
-                self.usage.cache_read = cache_read;
-                self.usage.cache_write = cache_write;
-                self.usage.reasoning = reasoning;
-                self.usage.total_input += input + cache_read + cache_write;
-                self.usage.total_output += output;
-                // What occupies the window: the prompt sent on this turn.
-                self.usage.context_used = input + cache_read + cache_write;
-                self.usage.turns += 1;
+                    self.usage.input = input;
+                    self.usage.output = output;
+                    self.usage.cache_read = cache_read;
+                    self.usage.cache_write = cache_write;
+                    self.usage.reasoning = reasoning;
+                    self.usage.total_input += input + cache_read + cache_write;
+                    self.usage.total_output += output;
+                    // What occupies the window: the prompt sent on this turn.
+                    self.usage.context_used = input + cache_read + cache_write;
+                    self.usage.turns += 1;
 
-                if let Some(m) = v.pointer("/message/model").and_then(Value::as_str) {
-                    self.usage.model = Some(m.to_string());
-                }
-                if let (Some(t), Some(prev)) = (ts, self.previous_ts) {
-                    let duration = (t - prev).max(0) as u64;
-                    // Discard huge gaps (the user away between turns).
-                    if duration > 0 && duration < 30 * 60 * 1000 {
-                        self.usage.last_turn_output = output;
-                        self.usage.last_turn_ms = duration;
+                    if let Some(m) = v.pointer("/message/model").and_then(Value::as_str) {
+                        self.usage.model = Some(m.to_string());
                     }
+                    if let (Some(t), Some(prev)) = (ts, self.previous_ts) {
+                        let duration = (t - prev).max(0) as u64;
+                        // Discard huge gaps (the user away between turns).
+                        if duration > 0 && duration < 30 * 60 * 1000 {
+                            self.usage.last_turn_output = output;
+                            self.usage.last_turn_ms = duration;
+                        }
+                    }
+                    self.dirty = true;
                 }
-                self.dirty = true;
             }
             if self.usage.external_id.is_none() {
                 if let Some(id) = v.get("sessionId").and_then(Value::as_str) {
@@ -311,6 +318,55 @@ mod tests {
         let u = r.poll().expect("usage");
         assert_eq!(u.turns, 1);
         assert_eq!(u.output, 5);
+        std::fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn synthetic_entries_do_not_clobber_model_or_context() {
+        let (base, cwd) = env("p3");
+        let dir = base.join(slug_cwd(&cwd));
+        let f = dir.join("s.jsonl");
+        std::fs::write(&f, b"").unwrap();
+
+        let mut r = ClaudeReader::new(&base, &cwd, 0);
+        let mut h = std::fs::OpenOptions::new().append(true).open(&f).unwrap();
+        writeln!(h, r#"{{"type":"user","timestamp":"2026-08-15T04:22:10.000Z"}}"#).unwrap();
+        writeln!(
+            h,
+            "{}",
+            assistant_line("2026-08-15T04:22:14.000Z", 1000, 200, 400, "claude-opus-5")
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let u = r.poll().expect("usage expected");
+        assert_eq!(u.model.as_deref(), Some("claude-opus-5"));
+        assert_eq!(u.context_used, 1200);
+
+        // An interrupt appends a synthetic entry with zero usage.
+        writeln!(
+            h,
+            r#"{{"type":"assistant","timestamp":"2026-08-15T04:23:00.000Z","sessionId":"sess-xyz","message":{{"model":"<synthetic>","usage":{{"input_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":0}}}}}}"#
+        )
+        .unwrap();
+        h.flush().unwrap();
+        if let Some(u2) = r.poll() {
+            assert_eq!(u2.model.as_deref(), Some("claude-opus-5"), "model must survive");
+            assert_eq!(u2.context_used, 1200, "context must survive");
+            assert_eq!(u2.turns, 1);
+        }
+
+        // A new real turn keeps accumulating on top of the real values.
+        writeln!(
+            h,
+            "{}",
+            assistant_line("2026-08-15T04:24:02.000Z", 1600, 400, 100, "claude-opus-5")
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let u3 = r.poll().expect("third poll");
+        assert_eq!(u3.model.as_deref(), Some("claude-opus-5"));
+        assert_eq!(u3.context_used, 2000);
+        assert_eq!(u3.turns, 2);
         std::fs::remove_dir_all(base).ok();
     }
 
