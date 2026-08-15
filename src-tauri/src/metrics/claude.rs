@@ -158,6 +158,30 @@ impl ClaudeReader {
             }
             return;
         }
+        // /effort mirrors /model: the args carry the level, and the stdout
+        // echo («Set effort level to …») covers the interactive pick.
+        if content.contains("<command-name>/effort</command-name>") {
+            let args = between(content, "<command-args>", "</command-args>").trim().to_string();
+            if !args.is_empty() {
+                self.usage.effort = Some(args);
+                self.dirty = true;
+            }
+            return;
+        }
+        if let Some(rest) = content.split("<local-command-stdout>Set effort level to ").nth(1) {
+            let raw = rest
+                .split(" (")
+                .next()
+                .unwrap_or("")
+                .split("</local-command-stdout>")
+                .next()
+                .unwrap_or("");
+            let name = strip_ansi(raw).trim().to_string();
+            if !name.is_empty() {
+                self.usage.effort = Some(name);
+                self.dirty = true;
+            }
+        }
         if let Some(rest) = content.split("<local-command-stdout>Set model to ").nth(1) {
             if !self.model_had_args {
                 let raw = rest
@@ -454,6 +478,65 @@ mod tests {
         h.flush().unwrap();
         let u3 = r.poll().expect("interactive change must emit an update");
         assert_eq!(u3.model.as_deref(), Some("Opus 5"), "ANSI must be stripped");
+        std::fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn slash_effort_changes_the_reported_effort_immediately() {
+        let (base, cwd) = env("p5");
+        let dir = base.join(slug_cwd(&cwd));
+        let f = dir.join("s.jsonl");
+        std::fs::write(&f, b"").unwrap();
+
+        let mut r = ClaudeReader::new(&base, &cwd, 0);
+        let mut h = std::fs::OpenOptions::new().append(true).open(&f).unwrap();
+        writeln!(
+            h,
+            "{}",
+            assistant_line("2026-08-15T04:22:14.000Z", 1000, 0, 400, "claude-opus-5")
+        )
+        .unwrap();
+        h.flush().unwrap();
+        assert_eq!(r.poll().unwrap().effort.as_deref(), Some("high"));
+
+        // /effort with an explicit argument.
+        writeln!(
+            h,
+            r#"{{"type":"user","timestamp":"2026-08-15T04:30:00.000Z","message":{{"role":"user","content":"<command-name>/effort</command-name>\n<command-args>max</command-args>"}}}}"#
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let u = r.poll().expect("effort change must emit an update");
+        assert_eq!(u.effort.as_deref(), Some("max"));
+        assert_eq!(u.turns, 1, "a command entry is not a turn");
+
+        // The stdout echo confirms the same value.
+        writeln!(
+            h,
+            r#"{{"type":"user","timestamp":"2026-08-15T04:30:00.100Z","message":{{"role":"user","content":"<local-command-stdout>Set effort level to max (this session only): Maximum capability.</local-command-stdout>"}}}}"#
+        )
+        .unwrap();
+        h.flush().unwrap();
+        if let Some(u2) = r.poll() {
+            assert_eq!(u2.effort.as_deref(), Some("max"));
+        }
+
+        // Interactive /effort: the echo carries the chosen level.
+        writeln!(
+            h,
+            r#"{{"type":"user","timestamp":"2026-08-15T04:31:00.000Z","message":{{"role":"user","content":"<command-name>/effort</command-name>\n<command-args></command-args>"}}}}"#
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let _ = r.poll();
+        writeln!(
+            h,
+            r#"{{"type":"user","timestamp":"2026-08-15T04:31:00.100Z","message":{{"role":"user","content":"<local-command-stdout>Set effort level to low (this session only): Less.</local-command-stdout>"}}}}"#
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let u3 = r.poll().expect("interactive effort must emit an update");
+        assert_eq!(u3.effort.as_deref(), Some("low"));
         std::fs::remove_dir_all(base).ok();
     }
 
