@@ -28,6 +28,9 @@ pub struct ClaudeReader {
     usage: Usage,
     /// Timestamp of the previous entry, used to measure the turn duration.
     previous_ts: Option<i64>,
+    /// The last `/model` entry carried an explicit argument, so the stdout
+    /// echo that follows must not overwrite the model id with a display name.
+    model_had_args: bool,
     dirty: bool,
 }
 
@@ -43,6 +46,7 @@ impl ClaudeReader {
             tail: None,
             usage: Usage::default(),
             previous_ts: None,
+            model_had_args: false,
             dirty: false,
         }
     }
@@ -123,9 +127,50 @@ impl ClaudeReader {
             }
         }
 
+        if v.get("type").and_then(Value::as_str) == Some("user") {
+            if let Some(content) = v.pointer("/message/content").and_then(Value::as_str) {
+                self.process_local_command(content);
+            }
+        }
+
         if let Some(t) = ts {
             self.previous_ts = Some(t);
         }
+    }
+
+    /// `/model` writes two `user` entries: the command with its args and the
+    /// CLI stdout («Set model to …»). Adopt the new model right away instead
+    /// of waiting for the next assistant entry.
+    fn process_local_command(&mut self, content: &str) {
+        if content.contains("<command-name>/model</command-name>") {
+            let args = between(content, "<command-args>", "</command-args>").trim().to_string();
+            if args.is_empty() {
+                // Interactive pick: the stdout echo carries the chosen name.
+                self.model_had_args = false;
+            } else {
+                self.usage.model = Some(args);
+                self.model_had_args = true;
+                self.dirty = true;
+            }
+            return;
+        }
+        if let Some(rest) = content.split("<local-command-stdout>Set model to ").nth(1) {
+            if !self.model_had_args {
+                let raw = rest
+                    .split("</local-command-stdout>")
+                    .next()
+                    .unwrap_or("")
+                    .split(" and saved")
+                    .next()
+                    .unwrap_or("");
+                let name = strip_ansi(raw).trim().to_string();
+                if !name.is_empty() {
+                    self.usage.model = Some(name);
+                    self.dirty = true;
+                }
+            }
+        }
+        self.model_had_args = false;
     }
 }
 
@@ -218,6 +263,33 @@ fn find_by_cwd(base: Option<&Path>, cwd_norm: &str, since_ms: u64) -> Option<Pat
         }
     }
     None
+}
+
+/// Extracts the text between two markers, or "" when the opener is absent.
+fn between<'a>(s: &'a str, open: &str, close: &str) -> &'a str {
+    match s.split_once(open) {
+        Some((_, rest)) => rest.split_once(close).map(|(a, _)| a).unwrap_or(rest),
+        None => "",
+    }
+}
+
+/// The CLI stdout wraps the model name in ANSI bold (`\x1b[1m…\x1b[22m`).
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Consume the sequence up to its terminating letter.
+            for n in chars.by_ref() {
+                if n.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 pub(crate) fn mtime_ms(m: &std::fs::Metadata) -> u64 {
@@ -318,6 +390,65 @@ mod tests {
         let u = r.poll().expect("usage");
         assert_eq!(u.turns, 1);
         assert_eq!(u.output, 5);
+        std::fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn slash_model_changes_the_reported_model_immediately() {
+        let (base, cwd) = env("p4");
+        let dir = base.join(slug_cwd(&cwd));
+        let f = dir.join("s.jsonl");
+        std::fs::write(&f, b"").unwrap();
+
+        let mut r = ClaudeReader::new(&base, &cwd, 0);
+        let mut h = std::fs::OpenOptions::new().append(true).open(&f).unwrap();
+        writeln!(
+            h,
+            "{}",
+            assistant_line("2026-08-15T04:22:14.000Z", 1000, 0, 400, "claude-opus-5")
+        )
+        .unwrap();
+        h.flush().unwrap();
+        assert_eq!(r.poll().unwrap().model.as_deref(), Some("claude-opus-5"));
+
+        // /model with an explicit argument: the id is adopted at once.
+        writeln!(
+            h,
+            r#"{{"type":"user","timestamp":"2026-08-15T04:30:00.000Z","message":{{"role":"user","content":"<command-name>/model</command-name>\n<command-args>claude-sonnet-5</command-args>"}}}}"#
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let u = r.poll().expect("model change must emit an update");
+        assert_eq!(u.model.as_deref(), Some("claude-sonnet-5"));
+        assert_eq!(u.turns, 1, "a command entry is not a turn");
+
+        // The stdout echo must not clobber the id with a display name.
+        writeln!(
+            h,
+            "{{\"type\":\"user\",\"timestamp\":\"2026-08-15T04:30:00.100Z\",\"message\":{{\"role\":\"user\",\"content\":\"<local-command-stdout>Set model to \\u001b[1mSonnet 5\\u001b[22m and saved as your default for new sessions</local-command-stdout>\"}}}}"
+        )
+        .unwrap();
+        h.flush().unwrap();
+        if let Some(u2) = r.poll() {
+            assert_eq!(u2.model.as_deref(), Some("claude-sonnet-5"));
+        }
+
+        // Interactive /model (no args): the stdout echo carries the name.
+        writeln!(
+            h,
+            r#"{{"type":"user","timestamp":"2026-08-15T04:31:00.000Z","message":{{"role":"user","content":"<command-name>/model</command-name>\n<command-args></command-args>"}}}}"#
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let _ = r.poll();
+        writeln!(
+            h,
+            "{{\"type\":\"user\",\"timestamp\":\"2026-08-15T04:31:00.100Z\",\"message\":{{\"role\":\"user\",\"content\":\"<local-command-stdout>Set model to \\u001b[1mOpus 5\\u001b[22m</local-command-stdout>\"}}}}"
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let u3 = r.poll().expect("interactive change must emit an update");
+        assert_eq!(u3.model.as_deref(), Some("Opus 5"), "ANSI must be stripped");
         std::fs::remove_dir_all(base).ok();
     }
 
