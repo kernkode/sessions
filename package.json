@@ -1,0 +1,44 @@
+{
+  "name": "sessions",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Consola multi-sesión para agentes CLI (Claude Code, Codex, OpenCode)",
+  "scripts": {
+    "dev": "vite",
+    "dev:free": "node scripts/free-port.mjs 5273",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "app:dev": "tauri dev",
+    "app:build": "tauri build",
+    "import:pi": "node scripts/import-pi-providers.mjs",
+    "icons": "node scripts/gen-icons.mjs",
+    "rs:check": "cd src-tauri && cargo check",
+    "rs:test": "cd src-tauri && cargo test"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-dialog": "2.7.2",
+    "@tauri-apps/plugin-opener": "2.5.4",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-search": "0.16.0",
+    "@xterm/addon-serialize": "0.14.0",
+    "@xterm/addon-unicode11": "0.9.0",
+    "@xterm/addon-webgl": "0.19.0",
+    "@xterm/xterm": "6.0.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.0.5",
+    "typescript": "5.9.3",
+    "vite": "8.2.1"
+  }
+}
