@@ -5,7 +5,7 @@ import { join } from "node:path";
 const T = "C:/Users/KernKode/AppData/Local/Temp/sess-resume";
 rmSync(T, { recursive: true, force: true });
 mkdirSync(join(T, "state"), { recursive: true });
-for (const f of ["config.toml", "providers.toml", "agents.toml"]) {
+for (const f of ["config.toml", "agents.toml"]) {
   copyFileSync(join(homedir(), ".sessions", f), join(T, f));
 }
 const cwd = "C:/Users/KernKode/Desktop/my-roleplay";
@@ -20,8 +20,6 @@ writeFileSync(
           project_id: "prj_r",
           title: "Claude Code",
           agent_id: "claude",
-          provider_id: "gorouter",
-          model: "claude-opus-5-thinking",
           cwd,
           external_id: "1a3e965a-cfff-43b2-aff2-89a9b2a15264",
           created_at: 1786790000000,

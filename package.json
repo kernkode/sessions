@@ -12,7 +12,6 @@
     "tauri": "tauri",
     "app:dev": "tauri dev",
     "app:build": "tauri build",
-    "import:pi": "node scripts/import-pi-providers.mjs",
     "icons": "node scripts/gen-icons.mjs",
     "rs:check": "cd src-tauri && cargo check",
     "rs:test": "cd src-tauri && cargo test"
