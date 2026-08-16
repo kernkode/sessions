@@ -333,7 +333,12 @@ fn relaunch(state: &AppState, previous: &SessionMeta, resume: bool) -> Outcome<S
         rows: Some(previous.rows),
         extra_args: Vec::new(),
     };
-    let created = create_session(state, req)?;
+    let mut created = create_session(state, req)?;
+    // Keep the original creation time so relaunching does not reshuffle the
+    // sidebar order (it sorts by created_at): a session must not jump to the
+    // top just because it was reopened.
+    created.created_at = previous.created_at;
+    state.store.upsert_session(created.clone());
     state.store.remove_session(&previous.id);
     Ok(created)
 }
