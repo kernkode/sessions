@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { api } from "../lib/ipc";
+import { useT } from "../lib/i18n";
 import { useStore } from "../state/store";
 import { IconChart, IconGear, IconMax, IconMin, IconPanel, IconPlus, IconX } from "./Icons";
 
@@ -12,6 +13,7 @@ export function TitleBar() {
   const setDialog = useStore((s) => s.setDialog);
   const toggleSidebar = useStore((s) => s.toggleSidebar);
   const toggleMetrics = useStore((s) => s.toggleMetrics);
+  const t = useT();
 
   return (
     <div className="titlebar">
@@ -21,41 +23,41 @@ export function TitleBar() {
           Sessions
         </div>
         <div className="tabs">
-          <span className="tab on">Sessions</span>
-          <span className="chip" title="Sessions with a live process">
+          <span className="tab on">{t("tb.sessions")}</span>
+          <span className="chip" title={t("tb.sessions")}>
             <span className={`dot ${aliveCount > 0 ? "working" : "exited"}`} />
-            {aliveCount} live
+            {t("tb.live", { n: aliveCount })}
           </span>
         </div>
       </div>
 
       <button
         className="icon-btn acc"
-        title="New session (Ctrl+Shift+T)"
+        title={t("tb.new")}
         onClick={() => setDialog("new-session")}
       >
         <IconPlus />
       </button>
-      <button className="icon-btn" title="Sidebar (Ctrl+Shift+B)" onClick={toggleSidebar}>
+      <button className="icon-btn" title={t("tb.sidebar")} onClick={toggleSidebar}>
         <IconPanel />
       </button>
-      <button className="icon-btn" title="Metrics (Ctrl+Shift+M)" onClick={toggleMetrics}>
+      <button className="icon-btn" title={t("tb.metrics")} onClick={toggleMetrics}>
         <IconChart />
       </button>
-      <button className="icon-btn" title={`Settings · v${version}`} onClick={() => setDialog("settings")}>
+      <button className="icon-btn" title={t("tb.settings", { v: version })} onClick={() => setDialog("settings")}>
         <IconGear />
       </button>
 
       <div className="win-btns">
-        <button className="win-btn" onClick={() => void win.minimize()} title="Minimize">
+        <button className="win-btn" onClick={() => void win.minimize()} title={t("tb.min")}>
           <IconMin />
         </button>
-        <button className="win-btn" onClick={() => void win.toggleMaximize()} title="Maximize">
+        <button className="win-btn" onClick={() => void win.toggleMaximize()} title={t("tb.max")}>
           <IconMax />
         </button>
         <button
           className="win-btn close"
-          title="Close"
+          title={t("tb.close")}
           onClick={async () => {
             // Orderly shutdown: saves scrollback and kills the child processes.
             await api.appShutdown().catch(() => {});

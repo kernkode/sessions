@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 
 import { fmtRate, shortId, shortPath } from "../lib/format";
 import { api } from "../lib/ipc";
+import { useT } from "../lib/i18n";
 import type { SessionMeta } from "../lib/types";
 import { useStore } from "../state/store";
 import { IconBranch, IconChevron, IconEdit, IconPlus, IconSearch, IconTrash } from "./Icons";
@@ -43,6 +44,7 @@ export function Sidebar() {
   const removeProject = useStore((s) => s.removeProject);
   const renameProject = useStore((s) => s.renameProject);
   const setDialog = useStore((s) => s.setDialog);
+  const t = useT();
   const [filter, setFilter] = useState("");
   // Removing a project takes its sessions with it: confirm in place.
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
@@ -84,11 +86,11 @@ export function Sidebar() {
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter sessions…"
+            placeholder={t("sb.filter")}
             spellCheck={false}
           />
         </div>
-        <button className="icon-btn" title="Add project" onClick={() => setDialog("new-session")}>
+        <button className="icon-btn" title={t("sb.addProject")} onClick={() => setDialog("new-session")}>
           <IconPlus />
         </button>
       </div>
@@ -96,7 +98,7 @@ export function Sidebar() {
       <div className="sidebar-list">
         {groups.length === 0 && (
           <div className="hint" style={{ padding: "10px 6px" }}>
-            No projects yet. Create a session to get started.
+            {t("sb.noProjects")}
           </div>
         )}
 
@@ -106,13 +108,13 @@ export function Sidebar() {
               <button
                 onClick={() => void toggleProject(project.id)}
                 style={{ display: "grid", placeItems: "center", opacity: 1 }}
-                title={project.collapsed ? "Expand" : "Collapse"}
+                title={project.collapsed ? t("sb.expand") : t("sb.collapse")}
               >
                 <IconChevron open={!project.collapsed} width={13} height={13} />
               </button>
               <span className="name">{project.name}</span>
               <button
-                title="New session in this project"
+                title={t("sb.newInProject")}
                 onClick={() => {
                   useStore.setState({ dialog: "new-session" });
                   window.dispatchEvent(
@@ -123,16 +125,16 @@ export function Sidebar() {
                 <IconPlus width={13} height={13} />
               </button>
               <button
-                title="Rename project"
+                title={t("sb.renameProject")}
                 onClick={() => {
-                  const n = window.prompt("Project name", project.name);
+                  const n = window.prompt(t("sb.projectName"), project.name);
                   if (n && n.trim() && n.trim() !== project.name)
                     void renameProject(project.id, n.trim());
                 }}
               >
                 <IconEdit width={13} height={13} />
               </button>
-              <button title="Remove project and its sessions" onClick={() => setPendingRemoval(project.id)}>
+              <button title={t("sb.removeProject")} onClick={() => setPendingRemoval(project.id)}>
                 <IconTrash width={13} height={13} />
               </button>
             </div>
@@ -140,10 +142,10 @@ export function Sidebar() {
             {pendingRemoval === project.id && (
               <div className="confirm-row">
                 <span>
-                  Remove “{project.name}” and its {list.length} session(s)
+                  {t("sb.confirmRemove", { name: project.name, n: list.length })}
                 </span>
                 <button className="chip btn" onClick={() => setPendingRemoval(null)}>
-                  No
+                  {t("sb.no")}
                 </button>
                 <button
                   className="chip btn danger"
@@ -152,7 +154,7 @@ export function Sidebar() {
                     void removeProject(project.id);
                   }}
                 >
-                  Yes
+                  {t("sb.yes")}
                 </button>
               </div>
             )}
@@ -177,17 +179,18 @@ export function Sidebar() {
 function SessionCard({ s, on, onClick }: { s: SessionMeta; on: boolean; onClick: () => void }) {
   // Narrow subscription: only this card repaints when its metrics change.
   const m = useStore((st) => st.metrics[s.id]);
+  const t = useT();
   const agent = useStore((st) => st.agents.find((a) => a.id === s.agent_id));
   const gitHead = useGitHead(s.cwd);
   const status = m?.status ?? s.status;
   const label =
     status === "working"
-      ? "Working"
+      ? t("st.working")
       : status === "idle"
-        ? "Idle"
+        ? t("st.idle")
         : status === "error"
-          ? "Error"
-          : "Ended";
+          ? t("st.error")
+          : t("st.ended");
 
   return (
     <div className={`card ${on ? "on" : ""}`} onClick={onClick} title={s.command_line ?? s.title}>

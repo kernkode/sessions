@@ -5,7 +5,8 @@
 
 [app]
 theme = "dark"
-language = "es"
+# "en" | "es". On first install it follows the OS locale (es → Spanish, else en).
+language = "en"
 # Al abrir la app se vuelven a lanzar las sesiones guardadas. Con los agentes que
 # lo admiten se reanuda su conversación (claude --resume <id>); el resto arrancan
 # de cero en el mismo directorio.

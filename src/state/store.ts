@@ -3,6 +3,7 @@
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { create } from "zustand";
 
+import { normLang, t } from "../lib/i18n";
 import { api, onMetrics, onSessionExit } from "../lib/ipc";
 import { pool } from "../term/pool";
 import type {
@@ -72,20 +73,21 @@ const BURST_MAX = 3;
 
 /** Tells the user a turn finished while the window was unfocused. */
 function turnDoneNotice() {
+  const lang = normLang(useStore.getState().config?.app.app.language);
   // Flash the taskbar so it is visible even in another app.
   try {
     void getCurrentWindow().requestUserAttention(UserAttentionType.Informational);
   } catch {
     // Not fatal: the title flash below still applies.
   }
-  const flash = "✔ turn finished — Sessions";
+  const flash = "✔ " + t(lang, "note.turnFinished") + " — Sessions";
   document.title = flash;
   window.setTimeout(() => {
     document.title = "Sessions";
   }, 4000);
   try {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Sessions", { body: "Turn finished" });
+      new Notification("Sessions", { body: t(lang, "note.turnFinished") });
     }
   } catch {
     // Web notifications are best-effort.
@@ -159,7 +161,7 @@ export const useStore = create<State>((set, get) => ({
       pool.setInputRejectedHandler((id) => {
         const s = get();
         if (s.alive.includes(id)) return;
-        s.notify("The session ended. Press Relaunch or Resume to reopen it.");
+        s.notify(t(normLang(s.config?.app.app.language), "note.ended"));
       });
 
       // Metrics live in their own map so lists are not re-rendered.
@@ -254,9 +256,13 @@ export const useStore = create<State>((set, get) => ({
 
     if (result.failed.length > 0) {
       const [title, reason] = result.failed[0];
-      get().notify("Could not resume “" + title + "”: " + reason);
+      get().notify(
+        t(normLang(get().config?.app.app.language), "note.couldNotResume", { t: title, r: reason }),
+      );
     } else if (result.sessions.length > 1) {
-      get().notify(result.sessions.length + " sessions resumed");
+      get().notify(
+        t(normLang(get().config?.app.app.language), "note.resumed", { n: result.sessions.length }),
+      );
     }
 
     // The resumed sessions carry new ids, so whatever was selected before no
@@ -273,7 +279,9 @@ export const useStore = create<State>((set, get) => ({
       set({ config });
       const issues = config.issues.length;
       get().notify(
-        issues > 0 ? `Configuration reloaded with ${issues} warning(s)` : "Configuration reloaded",
+        issues > 0
+          ? t(normLang(get().config?.app.app.language), "note.reloadWarn", { n: issues })
+          : t(normLang(get().config?.app.app.language), "note.reloadOk"),
       );
     } catch (e) {
       get().notify(String(e));

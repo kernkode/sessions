@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 import { shortPath } from "../lib/format";
+import { useT } from "../lib/i18n";
 import { useStore } from "../state/store";
 import { IconFolder } from "./Icons";
 
@@ -13,6 +14,7 @@ export function NewSessionDialog() {
   const sessions = useStore((s) => s.sessions);
   const home = useStore((s) => s.home);
   const createSession = useStore((s) => s.createSession);
+  const t = useT();
 
   const defaults = config?.app.defaults;
   const [path, setPath] = useState<string>(() => defaults?.cwd ?? home ?? "");
@@ -70,19 +72,19 @@ export function NewSessionDialog() {
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className="dialog">
-        <div className="dialog-head">New session</div>
+        <div className="dialog-head">{t("ns.title")}</div>
         <div className="dialog-body">
           <div className="field">
-            <label>Working directory</label>
+            <label>{t("ns.cwd")}</label>
             <div className="row">
               <input
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
-                placeholder="C:\path\to\project"
+                placeholder={t("ns.cwdPh")}
                 spellCheck={false}
               />
               <button className="btn" style={{ flex: "none" }} onClick={() => void pickFolder()}>
-                <IconFolder /> Browse
+                <IconFolder /> {t("ns.browse")}
               </button>
             </div>
             {projects.length > 0 && (
@@ -104,31 +106,31 @@ export function NewSessionDialog() {
 
           <div className="row">
             <div className="field">
-              <label>Agent</label>
+              <label>{t("ns.agent")}</label>
               <select value={agentId} onChange={(e) => setAgentId(e.target.value)}>
                 {agents.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name}
-                    {a.installed ? "" : " (not installed)"}
+                    {a.installed ? "" : t("ns.notInstalled")}
                   </option>
                 ))}
               </select>
               {agent && !agent.installed && (
                 <div className="hint" style={{ color: "var(--err)" }}>
-                  Executable not found on PATH.
+                  {t("ns.notOnPath")}
                 </div>
               )}
               {agent?.path && <div className="hint">{agent.path}</div>}
             </div>
 
             <div className="field">
-              <label>Title (optional)</label>
+              <label>{t("ns.titleOpt")}</label>
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Auto" />
             </div>
           </div>
 
           <div className="field">
-            <label>Resume</label>
+            <label>{t("ns.resume")}</label>
             <select
               value={resumeId}
               onChange={(e) => {
@@ -136,7 +138,7 @@ export function NewSessionDialog() {
                 if (e.target.value) setContinueLast(false);
               }}
             >
-              <option value="">New session</option>
+              <option value="">{t("ns.newSession")}</option>
               {previous.map((s) => (
                 <option key={s.id} value={s.external_id!}>
                   {s.title} · {s.external_id}
@@ -150,17 +152,17 @@ export function NewSessionDialog() {
                 disabled={Boolean(resumeId)}
                 onChange={(e) => setContinueLast(e.target.checked)}
               />
-              Continue the last session in the directory
+              {t("ns.continueLast")}
             </label>
           </div>
         </div>
 
         <div className="dialog-foot">
           <button className="btn" onClick={close}>
-            Cancel
+            {t("ns.cancel")}
           </button>
           <button className="btn primary" disabled={!canLaunch} onClick={() => void launch()}>
-            {creating ? "Launching…" : "Launch session"}
+            {creating ? t("ns.launching") : t("ns.launch")}
           </button>
         </div>
       </div>

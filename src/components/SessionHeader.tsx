@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 
 import { fmtDuration, shortPath } from "../lib/format";
 import { api } from "../lib/ipc";
+import { useT } from "../lib/i18n";
 import { selActiveMetrics, selActiveSession, useStore } from "../state/store";
 import { IconBranch, IconPlay, IconRefresh, IconSearch, IconStop, IconTerminal, IconTrash } from "./Icons";
 
 /** Rama + deshacer/rehacer del repo de la sesión (checkpoints git). */
 function GitBar({ cwd }: { cwd: string }) {
   const notify = useStore((s) => s.notify);
+  const t = useT();
   const [st, setSt] = useState<[boolean, string] | null>(null);
   const refresh = () => {
     api
@@ -22,7 +24,7 @@ function GitBar({ cwd }: { cwd: string }) {
   if (!st || !st[1]) return null;
   const [dirty, branch] = st;
   const act = async (fn: () => Promise<string>, msg: string) => {
-    if (dirty && !window.confirm("There are uncommitted changes; this will discard them. Continue?"))
+    if (dirty && !window.confirm(t("hdr.undoConfirm")))
       return;
     try {
       await fn();
@@ -33,14 +35,14 @@ function GitBar({ cwd }: { cwd: string }) {
     refresh();
   };
   return (
-    <span className="chip" title={dirty ? "uncommitted changes" : "clean tree"}>
+    <span className="chip" title={dirty ? t("hdr.dirty") : t("hdr.clean")}>
       <IconBranch width={11} height={11} />
       {branch}
       {dirty ? " •" : ""}
-      <button title="Undo (previous checkpoint)" onClick={() => void act(() => api.gitUndo(cwd), "Undone")}>
+      <button title={t("hdr.undo")} onClick={() => void act(() => api.gitUndo(cwd), t("hdr.undone"))}>
         ↩
       </button>
-      <button title="Redo" onClick={() => void act(() => api.gitRedo(cwd), "Redone")}>
+      <button title={t("hdr.redo")} onClick={() => void act(() => api.gitRedo(cwd), t("hdr.redone"))}>
         ↪
       </button>
     </span>
@@ -58,12 +60,13 @@ export function SessionHeader() {
   const clearTerminal = useStore((s) => s.clearTerminal);
   const setDialog = useStore((s) => s.setDialog);
   const renameSession = useStore((s) => s.renameSession);
+  const t = useT();
 
   if (!session) {
     return (
       <div className="header">
         <div className="crumbs">
-          <span className="crumb dim">No session selected</span>
+          <span className="crumb dim">{t("hdr.none")}</span>
         </div>
       </div>
     );
@@ -80,10 +83,10 @@ export function SessionHeader() {
         <span className={`dot ${status}`} />
         <span
           className="crumb"
-          title="Double-click to rename"
+          title={t("hdr.renameTip")}
           onDoubleClick={() => {
-            const t = window.prompt("Session title", session.title);
-            if (t && t.trim()) void renameSession(session.id, t.trim());
+            const nt = window.prompt(t("hdr.renameTitle"), session.title);
+            if (nt && nt.trim()) void renameSession(session.id, nt.trim());
           }}
         >
           {session.title}
@@ -94,23 +97,23 @@ export function SessionHeader() {
         </span>
       </div>
 
-      <span className="chip" title={`Agent: ${agent?.name ?? session.agent_id}`}>
+      <span className="chip" title={t("hdr.agent", { a: agent?.name ?? session.agent_id })}>
         <span className="dot" style={{ background: agent?.color ?? "var(--txt-3)", boxShadow: "none" }} />
         {agent?.name ?? session.agent_id}
       </span>
 
       {m?.model && (
-        <span className="chip mono" title="Model reported by the CLI">
+        <span className="chip mono" title={t("hdr.model")}>
           {m.model}
         </span>
       )}
       {m?.effort && (
-        <span className="chip mono" title="CLI reasoning effort">
+        <span className="chip mono" title={t("hdr.effort")}>
           {m.effort}
         </span>
       )}
       <GitBar cwd={session.cwd} />
-      <span className="chip mono" title="Session uptime">
+      <span className="chip mono" title={t("hdr.uptime")}>
         {fmtDuration(m?.uptime_ms ?? 0)}
       </span>
 
@@ -118,14 +121,14 @@ export function SessionHeader() {
 
       <button
         className="icon-btn"
-        title="Search in terminal (Ctrl+Shift+F)"
+        title={t("hdr.search")}
         onClick={() => setDialog("search")}
       >
         <IconSearch />
       </button>
       <button
         className="icon-btn"
-        title="Clear terminal (Ctrl+Shift+K)"
+        title={t("hdr.clear")}
         onClick={() => void clearTerminal(session.id)}
       >
         <IconTerminal />
@@ -133,27 +136,27 @@ export function SessionHeader() {
       {live ? (
         <button
           className="chip btn danger"
-          title="Stop process"
+          title={t("hdr.stopTip")}
           onClick={() => void stopSession(session.id)}
         >
-          <IconStop width={13} height={13} /> Stop
+          <IconStop width={13} height={13} /> {t("hdr.stop")}
         </button>
       ) : (
         <>
           <button
             className="chip btn"
-            title="Relaunch"
+            title={t("hdr.relaunchTip")}
             onClick={() => void restartSession(session.id, false)}
           >
-            <IconPlay width={13} height={13} /> Relaunch
+            <IconPlay width={13} height={13} /> {t("hdr.relaunch")}
           </button>
           {session.external_id && (
             <button
               className="chip btn"
-              title={`Resume CLI session ${session.external_id}`}
+              title={t("hdr.resumeTip", { id: session.external_id })}
               onClick={() => void restartSession(session.id, true)}
             >
-              <IconRefresh width={13} height={13} /> Resume
+              <IconRefresh width={13} height={13} /> {t("hdr.resume")}
             </button>
           )}
         </>

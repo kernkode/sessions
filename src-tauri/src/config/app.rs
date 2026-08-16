@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn default_config_parses() {
         let c: AppConfig = toml::from_str(DEFAULT_CONFIG_TOML).expect("valid toml");
-        assert_eq!(c.app.language, "es");
+        assert_eq!(c.app.language, "en");
         assert!(c.terminal.scrollback >= 1000);
         assert!(c.performance.flush_interval_ms > 0);
         assert!(!c.keybinds.is_empty());

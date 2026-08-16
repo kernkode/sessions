@@ -9,6 +9,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
 import { IconPlay, IconPlus, IconRefresh } from "./components/Icons";
+import { useT } from "./lib/i18n";
 import { pool } from "./term/pool";
 import { selActiveSession, useStore } from "./state/store";
 
@@ -115,7 +116,7 @@ export default function App() {
   }, []);
 
   if (!ready) {
-    return <div className="loading">Loading ~/.sessions…</div>;
+    return <div className="loading">{<LoadingText />}</div>;
   }
 
   return (
@@ -147,11 +148,17 @@ export default function App() {
  * nothing can be typed into it. This makes that explicit and puts the two ways
  * out within reach.
  */
+function LoadingText() {
+  const t = useT();
+  return <>{t("app.loading")}</>;
+}
+
 function EndedBanner() {
   const session = useStore(selActiveSession);
   const metrics = useStore((s) => (s.activeId ? s.metrics[s.activeId] : null));
   const alive = useStore((s) => s.alive);
   const restartSession = useStore((s) => s.restartSession);
+  const t = useT();
 
   if (!session) return null;
   const status = metrics?.status ?? session.status;
@@ -161,14 +168,14 @@ function EndedBanner() {
   return (
     <div className="session-ended">
       <span>
-        <b>Session ended.</b> This is the previous transcript; it does not accept input.
+        <b>{t("end.title")}</b> {t("end.body")}
       </span>
       <button className="chip btn" onClick={() => void restartSession(session.id, false)}>
-        <IconPlay width={12} height={12} /> Relaunch
+        <IconPlay width={12} height={12} /> {t("end.relaunch")}
       </button>
       {session.external_id && (
         <button className="chip btn" onClick={() => void restartSession(session.id, true)}>
-          <IconRefresh width={12} height={12} /> Resume
+          <IconRefresh width={12} height={12} /> {t("end.resume")}
         </button>
       )}
     </div>
@@ -176,23 +183,24 @@ function EndedBanner() {
 }
 
 const EMPTY_KEYS: [string, string[]][] = [
-  ["New session", ["Ctrl", "Shift", "T"]],
-  ["Switch session", ["Ctrl", "Tab"]],
-  ["Sidebar", ["Ctrl", "Shift", "B"]],
-  ["Reload config", ["Ctrl", "Shift", "R"]],
+  ["empty.k.new", ["Ctrl", "Shift", "T"]],
+  ["empty.k.switch", ["Ctrl", "Tab"]],
+  ["empty.k.sidebar", ["Ctrl", "Shift", "B"]],
+  ["empty.k.reload", ["Ctrl", "Shift", "R"]],
 ];
 
 function EmptyState() {
   const setDialog = useStore((s) => s.setDialog);
+  const t = useT();
   return (
     <div className="empty">
       <div>
         <span className="empty-mark">›</span>
-        <h2>No open sessions</h2>
-        <p>Launch Claude Code, Codex, pi or a plain terminal and track its tokens in real time.</p>
+        <h2>{t("empty.title")}</h2>
+        <p>{t("empty.body")}</p>
         <p style={{ marginTop: 18 }}>
           <button className="btn primary" onClick={() => setDialog("new-session")}>
-            <IconPlus width={13} height={13} /> New session
+            <IconPlus width={13} height={13} /> {t("empty.new")}
           </button>
         </p>
         <div className="empty-keys">
@@ -206,7 +214,7 @@ function EmptyState() {
                   </Fragment>
                 ))}
               </span>
-              {label}
+              {t(label)}
             </span>
           ))}
         </div>

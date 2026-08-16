@@ -43,12 +43,15 @@ impl Paths {
     }
 
     /// Creates the directory structure and the default TOML files if missing.
+    /// The initial language follows the OS locale (es → Spanish, else English).
     pub fn bootstrap(&self) -> Result<()> {
         for dir in [&self.root, &self.state, &self.scrollback, &self.logs] {
             fs::create_dir_all(dir)
-                .with_context(|| format!("creando directorio {}", dir.display()))?;
+                .with_context(|| format!("creating directory {}", dir.display()))?;
         }
-        write_if_absent(&self.config, crate::config::app::DEFAULT_CONFIG_TOML)?;
+        let cfg = crate::config::app::DEFAULT_CONFIG_TOML
+            .replacen("language = \"en\"", &format!("language = \"{}\"", detect_lang()), 1);
+        write_if_absent(&self.config, &cfg)?;
         write_if_absent(&self.agents, crate::config::agents::DEFAULT_AGENTS_TOML)?;
         Ok(())
     }
@@ -66,7 +69,15 @@ fn write_if_absent(path: &Path, contents: &str) -> Result<()> {
     if path.exists() {
         return Ok(());
     }
-    fs::write(path, contents).with_context(|| format!("escribiendo {}", path.display()))
+    fs::write(path, contents).with_context(|| format!("writing {}", path.display()))
+}
+
+/// OS UI language, reduced to the two supported locales (default English).
+fn detect_lang() -> &'static str {
+    match sys_locale::get_locale() {
+        Some(l) if l.to_lowercase().starts_with("es") => "es",
+        _ => "en",
+    }
 }
 
 /// Atomic write: writes to `.tmp` and renames. Prevents corrupt files if the app

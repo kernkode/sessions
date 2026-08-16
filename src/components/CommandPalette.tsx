@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useStore } from "../state/store";
+import { useT } from "../lib/i18n";
 
 interface Cmd {
   id: string;
@@ -19,6 +20,7 @@ export function CommandPalette() {
   const metricsOpen = useStore((s) => s.metricsOpen);
   const [q, setQ] = useState("");
   const [hi, setHi] = useState(0);
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -28,30 +30,31 @@ export function CommandPalette() {
   const cmds = useMemo<Cmd[]>(() => {
     const st = useStore.getState();
     const actions: Cmd[] = [
-      { id: "new", label: "New session", hint: "Ctrl+Shift+T", run: () => st.setDialog("new-session") },
-      { id: "settings", label: "Settings", hint: "Ctrl+,", run: () => st.setDialog("settings") },
+      { id: "new", label: t("pal.new"), hint: "Ctrl+Shift+T", run: () => st.setDialog("new-session") },
+      { id: "settings", label: t("pal.settings"), hint: "Ctrl+,", run: () => st.setDialog("settings") },
       {
         id: "sidebar",
-        label: sidebarOpen ? "Hide sidebar" : "Show sidebar",
+        label: sidebarOpen ? t("pal.hideSidebar") : t("pal.showSidebar"),
         hint: "Ctrl+Shift+B",
         run: () => st.toggleSidebar(),
       },
       {
         id: "metrics",
-        label: metricsOpen ? "Hide metrics bar" : "Show metrics bar",
+        label: metricsOpen ? t("pal.hideMetrics") : t("pal.showMetrics"),
         hint: "Ctrl+Shift+M",
         run: () => st.toggleMetrics(),
       },
-      { id: "reload", label: "Reload configuration", hint: "Ctrl+Shift+R", run: () => void st.reloadConfig() },
+      { id: "reload", label: t("pal.reload"), hint: "Ctrl+Shift+R", run: () => void st.reloadConfig() },
     ];
     const jumps: Cmd[] = sessions.map((s) => ({
       id: "s:" + s.id,
-      label: "Go to: " + s.title,
+      label: t("pal.goTo", { t: s.title }),
       hint: s.agent_id,
       run: () => void st.setActive(s.id),
     }));
     return [...actions, ...jumps];
-  }, [sessions, sidebarOpen, metricsOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions, sidebarOpen, metricsOpen, t]);
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -75,7 +78,7 @@ export function CommandPalette() {
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Type a command or session…"
+            placeholder={t("pal.placeholder")}
             spellCheck={false}
             style={{ flex: 1 }}
             onKeyDown={(e) => {
@@ -95,7 +98,7 @@ export function CommandPalette() {
           />
         </div>
         <div className="dialog-body" style={{ padding: 6 }}>
-          {list.length === 0 && <div className="hint" style={{ padding: 8 }}>No results.</div>}
+          {list.length === 0 && <div className="hint" style={{ padding: 8 }}>{t("pal.noResults")}</div>}
           {list.map((c, i) => (
             <div
               key={c.id}

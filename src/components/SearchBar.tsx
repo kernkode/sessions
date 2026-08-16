@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { pool } from "../term/pool";
+import { useT } from "../lib/i18n";
 import { useStore } from "../state/store";
 import { IconSearch, IconX } from "./Icons";
 
@@ -8,6 +9,7 @@ import { IconSearch, IconX } from "./Icons";
 export function SearchBar() {
   const activeId = useStore((s) => s.activeId);
   const setDialog = useStore((s) => s.setDialog);
+  const t = useT();
   const [text, setText] = useState("");
   const ref = useRef<HTMLInputElement>(null);
 
@@ -34,7 +36,7 @@ export function SearchBar() {
       <input
         ref={ref}
         value={text}
-        placeholder="Search…"
+        placeholder={t("search.placeholder")}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") find(e.shiftKey ? -1 : 1);
@@ -44,10 +46,10 @@ export function SearchBar() {
           }
         }}
       />
-      <button className="icon-btn" onClick={() => find(-1)} title="Previous (Shift+Enter)">
+      <button className="icon-btn" onClick={() => find(-1)} title={t("search.prev")}>
         ↑
       </button>
-      <button className="icon-btn" onClick={() => find(1)} title="Next (Enter)">
+      <button className="icon-btn" onClick={() => find(1)} title={t("search.next")}>
         ↓
       </button>
       <button
