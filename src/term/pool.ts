@@ -47,10 +47,10 @@ export const THEME: ITheme = {
 
 /** Light counterpart of THEME, kept in sync with the CSS light palette. */
 export const LIGHT_THEME: ITheme = {
-  background: "#f6f7f9",
+  background: "#f7f7f5",
   foreground: "#23262b",
   cursor: "#e04e2d",
-  cursorAccent: "#f6f7f9",
+  cursorAccent: "#f7f7f5",
   selectionBackground: "#c9d6ea",
   black: "#e8eaef",
   red: "#c23a2b",

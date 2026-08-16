@@ -44,6 +44,11 @@
   --info: #1f6fd0;
 }
 
+/* En claro, la consola pura se ve demasiado blanca; se le da un blanco roto. */
+:root[data-theme="light"] main {
+  background: #f7f7f5;
+}
+
 * {
   box-sizing: border-box;
 }
