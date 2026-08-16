@@ -10,6 +10,8 @@ this app only launches the process, keeps it alive and reads its telemetry.
 Built with Tauri 2 (Rust) + React. The binary is a few MB and the app idles at
 ~30 MB of RAM instead of the hundreds an Electron-based alternative would use.
 
+![Sessions](docs/screenshot.png)
+
 ---
 
 ## Requirements
