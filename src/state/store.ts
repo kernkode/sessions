@@ -92,6 +92,12 @@ function turnDoneNotice() {
   }
 }
 
+/** Applies [app] theme to the document and the terminals. */
+function applyTheme(theme: string) {
+  document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
+  pool.setTheme(theme);
+}
+
 /** Records an auto-relaunch and reports whether another one is safe. */
 function allowRelaunch(key: string): boolean {
   const now = Date.now();
@@ -143,6 +149,7 @@ export const useStore = create<State>((set, get) => ({
     try {
       const b = await api.bootstrap();
       set(applyBootstrap(b));
+      applyTheme(b.config.app.app.theme);
 
       const alive = await api.sessionActiveIds();
       set({ alive });
@@ -262,6 +269,7 @@ export const useStore = create<State>((set, get) => ({
     try {
       const config = await api.configReload();
       pool.setConfig(config.app.terminal, config.app.performance.max_live_terminals);
+      applyTheme(config.app.app.theme);
       set({ config });
       const issues = config.issues.length;
       get().notify(
@@ -440,6 +448,7 @@ export const useStore = create<State>((set, get) => ({
     try {
       const config = await api.configSetApp(app);
       pool.setConfig(config.app.terminal, config.app.performance.max_live_terminals);
+      applyTheme(config.app.app.theme);
       set({ config });
     } catch (e) {
       get().notify(String(e));

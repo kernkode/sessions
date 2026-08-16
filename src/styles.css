@@ -24,6 +24,26 @@
   --font-mono: "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
 }
 
+/* Tema claro: mismos tokens, paleta clara. Se activa con
+   <html data-theme="light"> desde la config ([app] theme). */
+:root[data-theme="light"] {
+  --bg: #f6f7f9;
+  --bg-2: #eef0f3;
+  --bg-3: #e8eaef;
+  --bg-4: #dcdfe6;
+  --line: #d5d9e0;
+  --line-2: #c2c8d3;
+  --txt: #23262b;
+  --txt-2: #565d68;
+  --txt-3: #8a919c;
+  --acc: #e04e2d;
+  --acc-2: #c93f1f;
+  --ok: #177a4c;
+  --warn: #9a6b00;
+  --err: #c23a2b;
+  --info: #1f6fd0;
+}
+
 * {
   box-sizing: border-box;
 }

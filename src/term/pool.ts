@@ -45,6 +45,31 @@ export const THEME: ITheme = {
   brightWhite: "#f0f2f5",
 };
 
+/** Light counterpart of THEME, kept in sync with the CSS light palette. */
+export const LIGHT_THEME: ITheme = {
+  background: "#f6f7f9",
+  foreground: "#23262b",
+  cursor: "#e04e2d",
+  cursorAccent: "#f6f7f9",
+  selectionBackground: "#c9d6ea",
+  black: "#e8eaef",
+  red: "#c23a2b",
+  green: "#177a4c",
+  yellow: "#9a6b00",
+  blue: "#1f6fd0",
+  magenta: "#8a3fbf",
+  cyan: "#0e7c8c",
+  white: "#3a3f46",
+  brightBlack: "#a2a8b1",
+  brightRed: "#e05a4a",
+  brightGreen: "#1e9e63",
+  brightYellow: "#b98600",
+  brightBlue: "#3d87e0",
+  brightMagenta: "#a558d8",
+  brightCyan: "#159ab0",
+  brightWhite: "#14161a",
+};
+
 interface Entry {
   id: string;
   term: Terminal;
@@ -100,6 +125,7 @@ class TerminalPool {
   private observer: ResizeObserver | null = null;
   private resizeTimer: number | null = null;
   private fontLoadKey = "";
+  private theme: ITheme = THEME;
   /// Called when input cannot be delivered (the session already ended).
   private onInputRejected: ((id: string) => void) | null = null;
 
@@ -208,7 +234,7 @@ class TerminalPool {
       scrollback: this.cfg?.scrollback ?? 8000,
       cursorBlink: this.cfg?.cursor_blink ?? true,
       cursorStyle: (this.cfg?.cursor_style as "bar" | "block" | "underline") ?? "bar",
-      theme: THEME,
+      theme: this.theme,
       convertEol: false,
       drawBoldTextInBrightColors: true,
       smoothScrollDuration: 0,
@@ -320,6 +346,19 @@ class TerminalPool {
       this.resizeTimer = null;
       this.fit();
     }, 60);
+  }
+
+  /** Switches every live terminal between the dark and light palettes. */
+  setTheme(theme: string) {
+    const t = theme === "light" ? LIGHT_THEME : THEME;
+    this.theme = t;
+    for (const e of this.entries.values()) {
+      try {
+        e.term.options.theme = t;
+      } catch {
+        // The renderer may not be active yet.
+      }
+    }
   }
 
   /** Recomputes metrics for every terminal: called when the fonts finish
