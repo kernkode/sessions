@@ -1,10 +1,29 @@
 import { useEffect, useState } from "react";
 
+
 import { fmtDuration, shortPath } from "../lib/format";
 import { api } from "../lib/ipc";
 import { useT } from "../lib/i18n";
 import { selActiveMetrics, selActiveSession, useStore } from "../state/store";
 import { IconBranch, IconPlay, IconRefresh, IconSearch, IconStop, IconTerminal, IconTrash } from "./Icons";
+
+/** Uptime that ticks every second, interpolating between metric publishes.
+ *  The backend only refreshes metrics every ~2 s, so without interpolation the
+ *  clock would visibly jump two seconds at a time. */
+function Uptime({ ms }: { ms?: number }) {
+  const t = useT();
+  const [base, setBase] = useState({ ms: ms ?? 0, at: Date.now() });
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    setBase({ ms: ms ?? 0, at: Date.now() });
+  }, [ms]);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((x) => x + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const value = base.ms + (Date.now() - base.at);
+  return <span className="chip mono" title={t("hdr.uptime")}>{fmtDuration(value)}</span>;
+}
 
 /** Rama + deshacer/rehacer del repo de la sesión (checkpoints git). */
 function GitBar({ cwd }: { cwd: string }) {
@@ -113,9 +132,7 @@ export function SessionHeader() {
         </span>
       )}
       <GitBar cwd={session.cwd} />
-      <span className="chip mono" title={t("hdr.uptime")}>
-        {fmtDuration(m?.uptime_ms ?? 0)}
-      </span>
+      <Uptime ms={m?.uptime_ms} />
 
       <div className="sep" />
 
