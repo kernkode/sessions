@@ -24,9 +24,9 @@ export function TitleBar() {
         </div>
         <div className="tabs">
           <span className="tab on">{t("tb.sessions")}</span>
-          <span className="chip" title={t("tb.sessions")}>
+          <span className="chip" title={t("tb.liveTip")}>
             <span className={`dot ${aliveCount > 0 ? "working" : "exited"}`} />
-            {t("tb.live", { n: aliveCount })}
+            {aliveCount === 1 ? t("tb.liveOne") : t("tb.liveMany", { n: aliveCount })}
           </span>
         </div>
       </div>

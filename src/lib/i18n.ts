@@ -12,6 +12,9 @@ export function normLang(l: string | null | undefined): Lang {
 const en: Record<string, string> = {
   "tb.sessions": "Sessions",
   "tb.live": "{n} live",
+  "tb.liveTip": "Sessions with a live process",
+  "tb.liveOne": "1 active session",
+  "tb.liveMany": "{n} active sessions",
   "tb.new": "New session (Ctrl+Shift+T)",
   "tb.sidebar": "Sidebar (Ctrl+Shift+B)",
   "tb.metrics": "Metrics (Ctrl+Shift+M)",
@@ -170,6 +173,9 @@ const en: Record<string, string> = {
 const es: Record<string, string> = {
   "tb.sessions": "Sesiones",
   "tb.live": "{n} activas",
+  "tb.liveTip": "Sesiones con proceso vivo",
+  "tb.liveOne": "1 sesión activa",
+  "tb.liveMany": "{n} sesiones activas",
   "tb.new": "Nueva sesión (Ctrl+Shift+T)",
   "tb.sidebar": "Panel lateral (Ctrl+Shift+B)",
   "tb.metrics": "Métricas (Ctrl+Shift+M)",

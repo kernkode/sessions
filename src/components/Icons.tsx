@@ -35,9 +35,10 @@ export const IconGear = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+/** Solid rounded square: reads unmistakably as "stop" even at small sizes. */
 export const IconStop = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
-    <rect x="6" y="6" width="12" height="12" rx="1.5" />
+    <rect x="6.5" y="6.5" width="11" height="11" rx="2.5" fill="currentColor" stroke="none" />
   </svg>
 );
 
