@@ -1,6 +1,51 @@
+import { useEffect, useState } from "react";
+
 import { fmtDuration, shortPath } from "../lib/format";
+import { api } from "../lib/ipc";
 import { selActiveMetrics, selActiveSession, useStore } from "../state/store";
-import { IconPlay, IconRefresh, IconSearch, IconStop, IconTerminal, IconTrash } from "./Icons";
+import { IconBranch, IconPlay, IconRefresh, IconSearch, IconStop, IconTerminal, IconTrash } from "./Icons";
+
+/** Rama + deshacer/rehacer del repo de la sesión (checkpoints git). */
+function GitBar({ cwd }: { cwd: string }) {
+  const notify = useStore((s) => s.notify);
+  const [st, setSt] = useState<[boolean, string] | null>(null);
+  const refresh = () => {
+    api
+      .gitStatus(cwd)
+      .then(setSt)
+      .catch(() => setSt(null));
+  };
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cwd]);
+  if (!st || !st[1]) return null;
+  const [dirty, branch] = st;
+  const act = async (fn: () => Promise<string>, msg: string) => {
+    if (dirty && !window.confirm("Hay cambios sin commitear; la operación los descartará. ¿Continuar?"))
+      return;
+    try {
+      await fn();
+      notify(msg);
+    } catch (e) {
+      notify(String(e));
+    }
+    refresh();
+  };
+  return (
+    <span className="chip" title={dirty ? "cambios sin commitear" : "árbol limpio"}>
+      <IconBranch width={11} height={11} />
+      {branch}
+      {dirty ? " •" : ""}
+      <button title="Deshacer (checkpoint anterior)" onClick={() => void act(() => api.gitUndo(cwd), "Deshecho")}>
+        ↩
+      </button>
+      <button title="Rehacer" onClick={() => void act(() => api.gitRedo(cwd), "Rehecho")}>
+        ↪
+      </button>
+    </span>
+  );
+}
 
 export function SessionHeader() {
   const session = useStore(selActiveSession);
@@ -64,6 +109,7 @@ export function SessionHeader() {
           {m.effort}
         </span>
       )}
+      <GitBar cwd={session.cwd} />
       <span className="chip mono" title="Tiempo de sesión">
         {fmtDuration(m?.uptime_ms ?? 0)}
       </span>

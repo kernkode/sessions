@@ -84,6 +84,15 @@ pub fn config_paths(state: State<'_, AppState>) -> ConfigPaths {
     state.config.snapshot().paths
 }
 
+/// Writes the `[app]` section back to config.toml (settings editor).
+#[tauri::command]
+pub fn config_set_app(
+    state: State<'_, AppState>,
+    app: crate::config::app::AppSection,
+) -> ConfigSnapshot {
+    state.config.set_app(app)
+}
+
 // ───────────────────────────── Projects ─────────────────────────────
 
 #[tauri::command]
@@ -317,6 +326,8 @@ pub fn session_restart(
 /// The new one is created **before** dropping the old record: if the launch fails
 /// (the agent is gone, the directory no longer exists...) the entry is not lost.
 fn relaunch(state: &AppState, previous: &SessionMeta, resume: bool) -> Outcome<SessionMeta> {
+    // Checkpoint the workspace so the run that is about to start can be undone.
+    let _ = crate::git::snapshot(std::path::Path::new(&previous.cwd), "antes de relanzar");
     let _ = state.sessions.close(&previous.id);
     state.metrics.untrack(&previous.id);
     state.channels.remove(&previous.id);
@@ -477,6 +488,28 @@ pub fn git_head(path: String) -> Option<String> {
     }
 }
 
+/// `(dirty, branch)` of the repo that contains `path`.
+#[tauri::command]
+pub fn git_status(path: String) -> (bool, String) {
+    crate::git::status(std::path::Path::new(&path))
+}
+
+/// Creates a checkpoint commit and records it; returns the hash.
+#[tauri::command]
+pub fn git_checkpoint(path: String, label: String) -> Option<String> {
+    crate::git::snapshot(std::path::Path::new(&path), &label)
+}
+
+#[tauri::command]
+pub fn git_undo(path: String) -> Outcome<String> {
+    crate::git::undo(std::path::Path::new(&path)).map_err(err)
+}
+
+#[tauri::command]
+pub fn git_redo(path: String) -> Outcome<String> {
+    crate::git::redo(std::path::Path::new(&path)).map_err(err)
+}
+
 /// Orderly shutdown requested by the UI before destroying the window.
 #[tauri::command]
 pub fn app_shutdown(state: State<'_, AppState>) {
@@ -489,6 +522,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
         bootstrap,
         config_reload,
         config_paths,
+        config_set_app,
         project_add,
         project_rename,
         project_set_collapsed,
@@ -512,6 +546,10 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
         list_dirs,
         home_dir,
         git_head,
+        git_status,
+        git_checkpoint,
+        git_undo,
+        git_redo,
         app_shutdown,
     ]
 }

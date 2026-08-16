@@ -3,6 +3,7 @@
 pub mod app;
 pub mod commands;
 pub mod config;
+pub mod git;
 pub mod launcher;
 pub mod metrics;
 pub mod model;
