@@ -27,13 +27,38 @@ pub fn spawn_agent_installer(config: Arc<ConfigStore>) {
     let _ = std::thread::Builder::new()
         .name("sessions-agent-install".into())
         .spawn(move || {
+            // The npm-based installers need Node; install it first if missing.
+            let node_dir = ensure_node();
+
+            // A Node installed in this run is not on this process' PATH yet.
+            let resolve = |name: &str| -> Option<std::path::PathBuf> {
+                if let Some(p) = crate::config::agents::which(name) {
+                    return Some(p);
+                }
+                let d = node_dir.as_deref()?;
+                for f in [format!("{d}\\{name}.cmd"), format!("{d}\\{name}.exe"), format!("{d}\\{name}")] {
+                    if std::path::Path::new(&f).is_file() {
+                        return Some(std::path::PathBuf::from(f));
+                    }
+                }
+                None
+            };
+
+            // Augment PATH so npm's own children (node, shims) resolve too.
+            let mut path = std::env::var("PATH").unwrap_or_default();
+            if let Some(d) = &node_dir {
+                if !path.is_empty() {
+                    path.push(';');
+                }
+                path.push_str(d);
+            }
+
             for a in config.snapshot().agents {
                 if a.resolve_program().is_some() || a.install.is_empty() {
                     continue;
                 }
                 let (prog, args) = a.install.split_first().unwrap();
-                // Resolve through PATH/PATHEXT so `npm` finds npm.cmd on Windows.
-                let prog = match crate::config::agents::which(prog) {
+                let prog = match resolve(prog) {
                     Some(p) => p,
                     None => {
                         eprintln!("Sessions: «{}» sin instalador disponible ({prog} no está en PATH)", a.id);
@@ -43,6 +68,7 @@ pub fn spawn_agent_installer(config: Arc<ConfigStore>) {
                 eprintln!("Sessions: instalando «{}»…", a.id);
                 match std::process::Command::new(prog)
                     .args(args)
+                    .env("PATH", &path)
                     .env("npm_config_fund", "false")
                     .env("npm_config_audit", "false")
                     .output()
@@ -57,6 +83,40 @@ pub fn spawn_agent_installer(config: Arc<ConfigStore>) {
                 }
             }
         });
+}
+
+/// Installs Node.js (winget, silent) when npm is missing and returns the default
+/// install dir so the just-installed npm is usable within this same run.
+fn ensure_node() -> Option<String> {
+    if crate::config::agents::which("npm").is_some() {
+        return None;
+    }
+    if let Some(winget) = crate::config::agents::which("winget") {
+        eprintln!("Sessions: npm no encontrado; instalando Node.js LTS (winget)…");
+        let _ = std::process::Command::new(winget)
+            .args([
+                "install",
+                "--id",
+                "OpenJS.NodeJS.LTS",
+                "--silent",
+                "--accept-package-agreements",
+                "--accept-source-agreements",
+            ])
+            .output();
+    }
+    node_default_dirs()
+        .into_iter()
+        .find(|d| std::path::Path::new(d).join("npm.cmd").is_file())
+}
+
+fn node_default_dirs() -> Vec<String> {
+    let mut v = Vec::new();
+    for var in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Ok(pf) = std::env::var(var) {
+            v.push(format!("{pf}\\nodejs"));
+        }
+    }
+    v
 }
 
 /// Binary PTY output channels, one per session.

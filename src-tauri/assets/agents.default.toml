@@ -11,7 +11,7 @@
 #    resume_args       reanudar una sesión concreta; admite {session_id}
 #    continue_args     continuar la última sesión del directorio
 #    [agent.env]       variables fijas del proceso
-#    metrics           claude-jsonl | codex-rollout | opencode-sqlite | pi-jsonl | none
+#    metrics           claude-jsonl | codex-rollout | pi-jsonl | none
 #    metrics_path      ruta alternativa del origen de métricas
 #    busy_hints        textos en la salida que indican "trabajando"
 #    install           argv para instalar el CLI si falta (una vez, en 2.º plano)
@@ -51,22 +51,6 @@ install = ["npm", "install", "-g", "@openai/codex"]
 metrics = "codex-rollout"
 color = "#10a37f"
 busy_hints = ["Esc to interrupt", "Working", "thinking"]
-
-[agent.env]
-FORCE_COLOR = "1"
-
-[[agent]]
-id = "opencode"
-name = "OpenCode"
-command = "opencode"
-command_windows = "opencode.exe"
-args = []
-resume_args = ["--session", "{session_id}"]
-continue_args = ["--continue"]
-install = ["npm", "install", "-g", "opencode-ai"]
-metrics = "opencode-sqlite"
-color = "#7c93ff"
-busy_hints = ["working", "thinking"]
 
 [agent.env]
 FORCE_COLOR = "1"

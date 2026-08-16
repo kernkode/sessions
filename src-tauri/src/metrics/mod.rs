@@ -6,7 +6,6 @@
 
 pub mod claude;
 pub mod codex;
-pub mod opencode;
 pub mod pi;
 pub mod reader;
 pub mod tail;
@@ -149,22 +148,6 @@ fn build_reader(spec: &TrackSpec) -> Box<dyn UsageReader> {
             match base {
                 Some(b) => Box::new(codex::CodexReader::new(
                     b,
-                    &spec.cwd,
-                    spec.external_id.clone(),
-                    since,
-                )),
-                None => Box::new(NullReader),
-            }
-        }
-        MetricsSource::OpencodeSqlite => {
-            let db = spec
-                .metrics_path
-                .clone()
-                .map(std::path::PathBuf::from)
-                .or_else(opencode::OpencodeReader::default_db);
-            match db {
-                Some(p) => Box::new(opencode::OpencodeReader::new(
-                    p,
                     &spec.cwd,
                     spec.external_id.clone(),
                     since,

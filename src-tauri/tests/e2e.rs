@@ -312,7 +312,7 @@ fn bootstrap_creates_the_user_directory_with_the_toml_files() {
 
     // The factory agents cover the CLIs the app knows how to launch.
     let snap = env.config.snapshot();
-    for agent in ["claude", "codex", "opencode", "pi", "shell"] {
+    for agent in ["claude", "codex", "pi", "shell"] {
         assert!(
             snap.agents.iter().any(|a| a.id == agent),
             "the factory agents do not include «{agent}»"

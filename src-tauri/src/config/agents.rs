@@ -30,8 +30,6 @@ pub enum MetricsSource {
     ClaudeJsonl,
     /// `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
     CodexRollout,
-    /// SQLite `~/.local/share/opencode/opencode.db`
-    OpencodeSqlite,
     /// `~/.pi/agent/sessions/<cwd-slug>/<ts>_<id>.jsonl`
     PiJsonl,
     /// No telemetry of its own: process metrics and output throughput only.
@@ -164,7 +162,7 @@ mod tests {
     fn default_agents_parse() {
         let f: AgentsFile = toml::from_str(DEFAULT_AGENTS_TOML).expect("valid toml");
         let ids: Vec<_> = f.agents.iter().map(|a| a.id.as_str()).collect();
-        for expected in ["claude", "codex", "opencode", "pi", "shell"] {
+        for expected in ["claude", "codex", "pi", "shell"] {
             assert!(ids.contains(&expected), "missing agent {expected}: {ids:?}");
         }
         let claude = f.agents.iter().find(|a| a.id == "claude").unwrap();
