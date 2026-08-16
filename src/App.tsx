@@ -125,14 +125,16 @@ export default function App() {
       <SessionHeader />
       <div className="body">
         {sidebarOpen && <Sidebar />}
-        <main>
-          <div id="term-host" ref={host} />
-          {!activeId && <EmptyState />}
-          <EndedBanner />
-          {dialog === "search" && <SearchBar />}
-        </main>
+        <div className="console-col">
+          <main>
+            <div id="term-host" ref={host} />
+            {!activeId && <EmptyState />}
+            <EndedBanner />
+            {dialog === "search" && <SearchBar />}
+          </main>
+          {metricsOpen && <MetricsBar />}
+        </div>
       </div>
-      {metricsOpen && <MetricsBar />}
 
       {dialog === "new-session" && <NewSessionDialog />}
       {dialog === "settings" && <SettingsDialog />}
