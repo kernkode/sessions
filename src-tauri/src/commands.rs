@@ -453,6 +453,25 @@ pub fn home_dir() -> Option<String> {
     dirs::home_dir().map(|p| p.display().to_string())
 }
 
+/// Short HEAD commit of the git repository that contains `path`, if any.
+/// Shown on the session cards instead of the process id.
+#[tauri::command]
+pub fn git_head(path: String) -> Option<String> {
+    let out = std::process::Command::new("git")
+        .args(["-C", &path, "rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
+}
+
 /// Orderly shutdown requested by the UI before destroying the window.
 #[tauri::command]
 pub fn app_shutdown(state: State<'_, AppState>) {
@@ -487,6 +506,7 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
         session_active_ids,
         list_dirs,
         home_dir,
+        git_head,
         app_shutdown,
     ]
 }

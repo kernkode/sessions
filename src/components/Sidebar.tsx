@@ -1,10 +1,38 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 
 import { fmtRate, shortId, shortPath } from "../lib/format";
+import { api } from "../lib/ipc";
 import type { SessionMeta } from "../lib/types";
 import { useStore } from "../state/store";
 import { IconBranch, IconChevron, IconPlus, IconSearch, IconTrash } from "./Icons";
+
+// HEAD commit por cwd, para no volver a preguntar por cada tarjeta igual.
+const gitHeadCache = new Map<string, string | null>();
+
+/** Commit HEAD (corto) del repo que contiene el cwd de la sesión. */
+function useGitHead(cwd: string): string | null {
+  const [hash, setHash] = useState<string | null>(gitHeadCache.get(cwd) ?? null);
+  useEffect(() => {
+    let on = true;
+    if (gitHeadCache.has(cwd)) {
+      setHash(gitHeadCache.get(cwd) ?? null);
+      return;
+    }
+    api
+      .gitHead(cwd)
+      .then((h) => {
+        if (!on) return;
+        gitHeadCache.set(cwd, h);
+        setHash(h);
+      })
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [cwd]);
+  return hash;
+}
 
 export function Sidebar() {
   const projects = useStore((s) => s.projects);
@@ -139,6 +167,7 @@ function SessionCard({ s, on, onClick }: { s: SessionMeta; on: boolean; onClick:
   // Narrow subscription: only this card repaints when its metrics change.
   const m = useStore((st) => st.metrics[s.id]);
   const agent = useStore((st) => st.agents.find((a) => a.id === s.agent_id));
+  const gitHead = useGitHead(s.cwd);
   const status = m?.status ?? s.status;
   const label =
     status === "working"
@@ -157,16 +186,19 @@ function SessionCard({ s, on, onClick }: { s: SessionMeta; on: boolean; onClick:
       <div className="card-body">
         <div className="card-title">{s.title}</div>
         <div className="card-sub">
-          {s.external_id ? (
+          <span className="ext">{s.agent_id}</span>
+          {gitHead ? (
             <>
               <IconBranch width={11} height={11} />
-              <span className="ext">{shortId(s.external_id, 18)}</span>
+              <span className="ext">{gitHead}</span>
             </>
           ) : (
-            <span className="ext">
-              {s.agent_id}
-              {s.pid ? ` · pid ${s.pid}` : ""}
-            </span>
+            s.external_id && (
+              <>
+                <IconBranch width={11} height={11} />
+                <span className="ext">{shortId(s.external_id, 18)}</span>
+              </>
+            )
           )}
         </div>
         <div className={`card-state ${status}`}>

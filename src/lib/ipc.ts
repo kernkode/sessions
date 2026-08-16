@@ -51,6 +51,7 @@ export const api = {
 
   listDirs: (path: string) => invoke<DirEntry[]>("list_dirs", { path }),
   homeDir: () => invoke<string | null>("home_dir"),
+  gitHead: (path: string) => invoke<string | null>("git_head", { path }),
   appShutdown: () => invoke<void>("app_shutdown"),
 };
 
