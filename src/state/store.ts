@@ -1,5 +1,6 @@
 // Global state. zustand with narrow selectors so terminal output (which never
 // goes through React) and metrics do not trigger cascading re-renders.
+import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { create } from "zustand";
 
 import { api, onMetrics, onSessionExit } from "../lib/ipc";
@@ -50,6 +51,8 @@ interface State {
   addProject: (path: string, name?: string) => Promise<Project | null>;
   removeProject: (id: string) => Promise<void>;
   toggleProject: (id: string) => Promise<void>;
+  renameProject: (id: string, name: string) => Promise<void>;
+  updateAppConfig: (patch: Partial<ConfigSnapshot["app"]["app"]>) => Promise<void>;
   setDialog: (d: Dialog) => void;
   toggleSidebar: () => void;
   toggleMetrics: () => void;
@@ -66,6 +69,28 @@ const userStopped = new Set<string>();
 const relaunchBurst = new Map<string, number[]>();
 const BURST_WINDOW_MS = 120_000;
 const BURST_MAX = 3;
+
+/** Tells the user a turn finished while the window was unfocused. */
+function turnDoneNotice() {
+  // Flash the taskbar so it is visible even in another app.
+  try {
+    void getCurrentWindow().requestUserAttention(UserAttentionType.Informational);
+  } catch {
+    // Not fatal: the title flash below still applies.
+  }
+  const flash = "✔ turno terminado — Sessions";
+  document.title = flash;
+  window.setTimeout(() => {
+    document.title = "Sessions";
+  }, 4000);
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Sessions", { body: "Turno terminado" });
+    }
+  } catch {
+    // Web notifications are best-effort.
+  }
+}
 
 /** Records an auto-relaunch and reports whether another one is safe. */
 function allowRelaunch(key: string): boolean {
@@ -132,12 +157,14 @@ export const useStore = create<State>((set, get) => ({
 
       // Metrics live in their own map so lists are not re-rendered.
       await onMetrics((m) => {
+        const prev = get().metrics[m.session_id]?.status;
         set((s) => ({
           metrics: { ...s.metrics, [m.session_id]: m },
           sessions: s.sessions.map((x) =>
             x.id === m.session_id && x.status !== m.status ? { ...x, status: m.status } : x,
           ),
         }));
+        if (prev === "working" && m.status !== "working" && document.hidden) turnDoneNotice();
       });
 
       await onSessionExit(({ session_id, code }) => {
@@ -395,6 +422,28 @@ export const useStore = create<State>((set, get) => ({
     const collapsed = !p.collapsed;
     set((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, collapsed } : x)) }));
     await api.projectSetCollapsed(id, collapsed);
+  },
+
+  async renameProject(id, name) {
+    try {
+      const ok = await api.projectRename(id, name);
+      if (ok) set((s) => ({ projects: s.projects.map((p) => (p.id === id ? { ...p, name } : p)) }));
+    } catch (e) {
+      get().notify(String(e));
+    }
+  },
+
+  async updateAppConfig(patch) {
+    const cur = get().config;
+    if (!cur) return;
+    const app = { ...cur.app.app, ...patch };
+    try {
+      const config = await api.configSetApp(app);
+      pool.setConfig(config.app.terminal, config.app.performance.max_live_terminals);
+      set({ config });
+    } catch (e) {
+      get().notify(String(e));
+    }
   },
 
   setDialog: (d) => set({ dialog: d }),

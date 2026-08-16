@@ -20,6 +20,7 @@ export const api = {
   bootstrap: () => invoke<Bootstrap>("bootstrap"),
   configReload: () => invoke<ConfigSnapshot>("config_reload"),
   configPaths: () => invoke<ConfigPaths>("config_paths"),
+  configSetApp: (app: unknown) => invoke<ConfigSnapshot>("config_set_app", { app }),
 
   projectAdd: (path: string, name?: string) => invoke<Project>("project_add", { path, name }),
   projectRename: (id: string, name: string) => invoke<boolean>("project_rename", { id, name }),
@@ -52,6 +53,10 @@ export const api = {
   listDirs: (path: string) => invoke<DirEntry[]>("list_dirs", { path }),
   homeDir: () => invoke<string | null>("home_dir"),
   gitHead: (path: string) => invoke<string | null>("git_head", { path }),
+  gitStatus: (path: string) => invoke<[boolean, string]>("git_status", { path }),
+  gitCheckpoint: (path: string, label: string) => invoke<string | null>("git_checkpoint", { path, label }),
+  gitUndo: (path: string) => invoke<string>("git_undo", { path }),
+  gitRedo: (path: string) => invoke<string>("git_redo", { path }),
   appShutdown: () => invoke<void>("app_shutdown"),
 };
 

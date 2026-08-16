@@ -27,6 +27,9 @@ pub struct Usage {
     /// Output tokens and duration of the last turn: the basis for tok/s.
     pub last_turn_output: u64,
     pub last_turn_ms: u64,
+    /// Last instant the CLI wrote a real (assistant) entry: a fallback activity
+    /// signal for "working" when the TUI spinner glyphs change.
+    pub last_activity_ms: u64,
     /// Cost reported by the agent, if it reports one.
     pub cost_usd: Option<f64>,
 }

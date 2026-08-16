@@ -5,7 +5,7 @@ import { fmtRate, shortId, shortPath } from "../lib/format";
 import { api } from "../lib/ipc";
 import type { SessionMeta } from "../lib/types";
 import { useStore } from "../state/store";
-import { IconBranch, IconChevron, IconPlus, IconSearch, IconTrash } from "./Icons";
+import { IconBranch, IconChevron, IconEdit, IconPlus, IconSearch, IconTrash } from "./Icons";
 
 // HEAD commit por cwd, para no volver a preguntar por cada tarjeta igual.
 const gitHeadCache = new Map<string, string | null>();
@@ -41,6 +41,7 @@ export function Sidebar() {
   const setActive = useStore((s) => s.setActive);
   const toggleProject = useStore((s) => s.toggleProject);
   const removeProject = useStore((s) => s.removeProject);
+  const renameProject = useStore((s) => s.renameProject);
   const setDialog = useStore((s) => s.setDialog);
   const [filter, setFilter] = useState("");
   // Removing a project takes its sessions with it: confirm in place.
@@ -120,6 +121,16 @@ export function Sidebar() {
                 }}
               >
                 <IconPlus width={13} height={13} />
+              </button>
+              <button
+                title="Renombrar proyecto"
+                onClick={() => {
+                  const n = window.prompt("Nombre del proyecto", project.name);
+                  if (n && n.trim() && n.trim() !== project.name)
+                    void renameProject(project.id, n.trim());
+                }}
+              >
+                <IconEdit width={13} height={13} />
               </button>
               <button title="Quitar proyecto y sus sesiones" onClick={() => setPendingRemoval(project.id)}>
                 <IconTrash width={13} height={13} />

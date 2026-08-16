@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef } from "react";
 
+import { CommandPalette } from "./components/CommandPalette";
 import { MetricsBar } from "./components/MetricsBar";
 import { NewSessionDialog } from "./components/NewSessionDialog";
 import { SearchBar } from "./components/SearchBar";
@@ -63,6 +64,11 @@ export default function App() {
       if (e.key === ",") {
         take();
         s.setDialog("settings");
+        return;
+      }
+      if (e.key === "k") {
+        take();
+        s.setDialog("palette");
         return;
       }
       if (!e.shiftKey) return;
@@ -129,6 +135,7 @@ export default function App() {
 
       {dialog === "new-session" && <NewSessionDialog />}
       {dialog === "settings" && <SettingsDialog />}
+      {dialog === "palette" && <CommandPalette />}
 
       {(notice || error) && <div className="toast">{error ?? notice}</div>}
     </div>

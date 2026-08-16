@@ -109,6 +109,7 @@ impl ClaudeReader {
                     // What occupies the window: the prompt sent on this turn.
                     self.usage.context_used = input + cache_read + cache_write;
                     self.usage.turns += 1;
+                    self.usage.last_activity_ms = crate::model::now_ms();
 
                     if let Some(m) = v.pointer("/message/model").and_then(Value::as_str) {
                         self.usage.model = Some(m.to_string());

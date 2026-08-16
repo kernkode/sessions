@@ -220,7 +220,15 @@ fn poll_loop(
                     continue;
                 }
 
-                let status = session_status(&t.spec.pty);
+                let mut status = session_status(&t.spec.pty);
+                // Fallback: recent CLI activity in the JSONL counts as working,
+                // so a Claude update that changes the spinner glyphs cannot
+                // silently break detection while the process is alive.
+                if status != SessionStatus::Exited
+                    && now_ms().saturating_sub(t.usage.last_activity_ms) < 1_500
+                {
+                    status = SessionStatus::Working;
+                }
                 let working = status == SessionStatus::Working;
                 t.next_poll = now + if working { active } else { idle };
 

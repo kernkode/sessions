@@ -70,6 +70,17 @@ impl ConfigStore {
         self.snapshot.read().app.clone()
     }
 
+    /// Replaces the `[app]` section, persists it to config.toml and reloads.
+    /// Comments in the file are lost on rewrite; values win.
+    pub fn set_app(&self, section: app::AppSection) -> ConfigSnapshot {
+        let mut cfg = self.app_config();
+        cfg.app = section;
+        if let Ok(raw) = toml::to_string_pretty(&cfg) {
+            let _ = fs::write(&self.paths.config, raw);
+        }
+        self.reload()
+    }
+
     pub fn perf(&self) -> app::PerformanceSection {
         self.snapshot.read().app.performance.sanitized()
     }

@@ -168,8 +168,28 @@ function PathRow({ label, path, onOpen }: { label: string; path: string; onOpen:
   );
 }
 
-const Bool = ({ v }: { v: boolean }) => (
-  <span className={`badge ${v ? "ok" : ""}`}>{v ? "sí" : "no"}</span>
+const Bool = ({ v, onChange }: { v: boolean; onChange: (v: boolean) => void }) => (
+  <button className={`badge ${v ? "ok" : ""}`} title="cambiar" onClick={() => onChange(!v)}>
+    {v ? "sí" : "no"}
+  </button>
+);
+
+const Select = ({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) => (
+  <select className="mini" value={value} onChange={(e) => onChange(e.target.value)}>
+    {options.map((o) => (
+      <option key={o} value={o}>
+        {o}
+      </option>
+    ))}
+  </select>
 );
 
 /** «Ctrl+Shift+T» como teclas físicas. */
@@ -197,6 +217,8 @@ function GeneralTab({
   paths: ConfigPaths;
   open: (p: string) => void;
 }) {
+  const set = (patch: Partial<AppConfig["app"]>) =>
+    void useStore.getState().updateAppConfig(patch);
   return (
     <>
       <Section title="Almacenamiento">
@@ -207,25 +229,29 @@ function GeneralTab({
 
       <Section title="Aplicación">
         <Row label="Tema">
-          <span className="val">{app.app.theme}</span>
+          <Select value={app.app.theme} options={["dark", "light"]} onChange={(v) => set({ theme: v })} />
         </Row>
         <Row label="Idioma">
-          <span className="val">{app.app.language}</span>
+          <Select value={app.app.language} options={["es", "en"]} onChange={(v) => set({ language: v })} />
         </Row>
         <Row label="Restaurar sesiones al abrir">
-          <Bool v={app.app.restore_sessions} />
+          <Bool v={app.app.restore_sessions} onChange={(v) => set({ restore_sessions: v })} />
         </Row>
         <Row label="Reanudación automática">
-          <span className="val">{app.app.auto_resume}</span>
+          <Select
+            value={app.app.auto_resume}
+            options={["active", "all", "none"]}
+            onChange={(v) => set({ auto_resume: v })}
+          />
         </Row>
         <Row label="Confirmar al cerrar">
-          <Bool v={app.app.confirm_on_close} />
+          <Bool v={app.app.confirm_on_close} onChange={(v) => set({ confirm_on_close: v })} />
         </Row>
         <Row label="Scrollback persistente">
-          <Bool v={app.app.persist_scrollback} />
+          <Bool v={app.app.persist_scrollback} onChange={(v) => set({ persist_scrollback: v })} />
         </Row>
         <Row label="Relanzar al terminar">
-          <Bool v={app.app.auto_relaunch} />
+          <Bool v={app.app.auto_relaunch} onChange={(v) => set({ auto_relaunch: v })} />
         </Row>
       </Section>
 
