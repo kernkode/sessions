@@ -33,6 +33,9 @@ pub struct AppSection {
     pub confirm_on_close: bool,
     /// Persist scrollback to disk when the app closes.
     pub persist_scrollback: bool,
+    /// Relaunch or resume a session whose process ended on its own, instead of
+    /// leaving the «sesión terminada» transcript on screen.
+    pub auto_relaunch: bool,
 }
 
 impl Default for AppSection {
@@ -44,6 +47,7 @@ impl Default for AppSection {
             auto_resume: "active".into(),
             confirm_on_close: true,
             persist_scrollback: true,
+            auto_relaunch: true,
         }
     }
 }

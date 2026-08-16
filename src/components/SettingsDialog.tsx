@@ -224,6 +224,9 @@ function GeneralTab({
         <Row label="Scrollback persistente">
           <Bool v={app.app.persist_scrollback} />
         </Row>
+        <Row label="Relanzar al terminar">
+          <Bool v={app.app.auto_relaunch} />
+        </Row>
       </Section>
 
       <Section title="Atajos de teclado">

@@ -57,6 +57,29 @@ interface State {
   cycleSession: (delta: number) => Promise<void>;
 }
 
+// Sessions the user stopped on purpose (Detener / cerrar): their exit must not
+// trigger an auto-relaunch, or the stop button would be useless.
+const userStopped = new Set<string>();
+// Timestamps of recent auto-relaunches per project+title (the id changes on
+// restart). Caps crash loops: a session that dies right after being relaunched
+// three times in a row is left alone with the transcript banner.
+const relaunchBurst = new Map<string, number[]>();
+const BURST_WINDOW_MS = 120_000;
+const BURST_MAX = 3;
+
+/** Records an auto-relaunch and reports whether another one is safe. */
+function allowRelaunch(key: string): boolean {
+  const now = Date.now();
+  const recent = (relaunchBurst.get(key) ?? []).filter((t) => now - t < BURST_WINDOW_MS);
+  if (recent.length >= BURST_MAX) {
+    relaunchBurst.set(key, recent);
+    return false;
+  }
+  recent.push(now);
+  relaunchBurst.set(key, recent);
+  return true;
+}
+
 function applyBootstrap(b: Bootstrap) {
   pool.setConfig(b.config.app.terminal, b.config.app.performance.max_live_terminals);
   return {
@@ -124,11 +147,28 @@ export const useStore = create<State>((set, get) => ({
           ),
           alive: s.alive.filter((v) => v !== session_id),
         }));
-        pool.write(
-          session_id,
-          `\r\n\x1b[38;5;244m── proceso terminado (código ${code}) ──\x1b[0m\r\n`,
-        );
+
+        const meta = get().sessions.find((x) => x.id === session_id);
+        const auto =
+          !!meta &&
+          !userStopped.has(session_id) &&
+          (get().config?.app.app.auto_relaunch ?? true) &&
+          allowRelaunch(meta.project_id + "\0" + meta.title);
+
+        if (!auto) {
+          pool.write(
+            session_id,
+            `\r\n\x1b[38;5;244m── proceso terminado (código ${code}) ──\x1b[0m\r\n`,
+          );
+        }
         pool.collect(new Set(get().alive));
+
+        // The process ended on its own: bring it back (resume when the CLI
+        // supports it) instead of leaving the «sesión terminada» banner.
+        if (auto && meta) {
+          userStopped.delete(session_id);
+          void get().restartSession(session_id, Boolean(meta.external_id));
+        }
       });
 
       // Bring the saved sessions back, so the user finds their agents already
@@ -214,6 +254,22 @@ export const useStore = create<State>((set, get) => ({
     }
     set({ activeId: id });
     if (!id) return;
+
+    // Opening a session whose process is gone relaunches it instead of showing
+    // the dead transcript, so the user never has to press Relanzar/Reanudar.
+    const dead = get().sessions.find((s) => s.id === id);
+    if (
+      dead &&
+      !get().alive.includes(id) &&
+      !userStopped.has(id) &&
+      (get().config?.app.app.auto_relaunch ?? true) &&
+      allowRelaunch(dead.project_id + "\0" + dead.title)
+    ) {
+      userStopped.delete(id);
+      await get().restartSession(id, Boolean(dead.external_id));
+      return;
+    }
+
     try {
       const meta = get().sessions.find((s) => s.id === id);
       // A session with no live process is rehydrated by replaying its history at
@@ -251,6 +307,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   async closeSession(id, keep = false) {
+    userStopped.add(id);
     try {
       await api.sessionClose(id, keep);
     } catch (e) {
@@ -274,6 +331,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   async stopSession(id) {
+    userStopped.add(id);
     try {
       await api.sessionKill(id);
     } catch (e) {

@@ -13,6 +13,9 @@ restore_sessions = true
 auto_resume = "active"      # active (la última usada) | all (todas) | none
 confirm_on_close = true
 persist_scrollback = true
+# Si el proceso de una sesión termina solo, relánzala o reanúdala en vez de
+# dejar el registro de «sesión terminada» en pantalla.
+auto_relaunch = true
 
 [terminal]
 font_family = "JetBrains Mono, Cascadia Code, Menlo, Consolas, monospace"

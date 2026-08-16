@@ -103,6 +103,7 @@ export interface AppConfig {
     auto_resume: string;
     confirm_on_close: boolean;
     persist_scrollback: boolean;
+    auto_relaunch: boolean;
   };
   terminal: TerminalConfig;
   performance: PerformanceConfig;
