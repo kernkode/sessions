@@ -516,6 +516,13 @@ main {
   overflow: hidden;
 }
 
+/* El viewport de xterm pinta de negro puro el sobrante bajo la última fila,
+   dejando una franja negra sobre la barra de métricas. Transparente, ese
+   espacio toma el fondo del panel y desaparece visualmente. */
+.term-instance .xterm-viewport {
+  background: transparent;
+}
+
 /* Banner shown over the terminal of a session whose process ended. It sits at the
    bottom so it does not cover the first lines of the restored screen. */
 .session-ended {
