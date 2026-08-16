@@ -115,7 +115,7 @@ export default function App() {
   }, []);
 
   if (!ready) {
-    return <div className="loading">Cargando ~/.sessions…</div>;
+    return <div className="loading">Loading ~/.sessions…</div>;
   }
 
   return (
@@ -161,14 +161,14 @@ function EndedBanner() {
   return (
     <div className="session-ended">
       <span>
-        <b>Sesión terminada.</b> Esto es el registro de la anterior; no acepta escritura.
+        <b>Session ended.</b> This is the previous transcript; it does not accept input.
       </span>
       <button className="chip btn" onClick={() => void restartSession(session.id, false)}>
-        <IconPlay width={12} height={12} /> Relanzar
+        <IconPlay width={12} height={12} /> Relaunch
       </button>
       {session.external_id && (
         <button className="chip btn" onClick={() => void restartSession(session.id, true)}>
-          <IconRefresh width={12} height={12} /> Reanudar
+          <IconRefresh width={12} height={12} /> Resume
         </button>
       )}
     </div>
@@ -176,10 +176,10 @@ function EndedBanner() {
 }
 
 const EMPTY_KEYS: [string, string[]][] = [
-  ["Nueva sesión", ["Ctrl", "Shift", "T"]],
-  ["Cambiar de sesión", ["Ctrl", "Tab"]],
-  ["Panel lateral", ["Ctrl", "Shift", "B"]],
-  ["Recargar configuración", ["Ctrl", "Shift", "R"]],
+  ["New session", ["Ctrl", "Shift", "T"]],
+  ["Switch session", ["Ctrl", "Tab"]],
+  ["Sidebar", ["Ctrl", "Shift", "B"]],
+  ["Reload config", ["Ctrl", "Shift", "R"]],
 ];
 
 function EmptyState() {
@@ -188,11 +188,11 @@ function EmptyState() {
     <div className="empty">
       <div>
         <span className="empty-mark">›</span>
-        <h2>Sin sesiones abiertas</h2>
-        <p>Lanza Claude Code, Codex, OpenCode o una terminal y sigue sus tokens en tiempo real.</p>
+        <h2>No open sessions</h2>
+        <p>Launch Claude Code, Codex, pi or a plain terminal and track its tokens in real time.</p>
         <p style={{ marginTop: 18 }}>
           <button className="btn primary" onClick={() => setDialog("new-session")}>
-            <IconPlus width={13} height={13} /> Nueva sesión
+            <IconPlus width={13} height={13} /> New session
           </button>
         </p>
         <div className="empty-keys">

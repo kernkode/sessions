@@ -28,25 +28,25 @@ export function CommandPalette() {
   const cmds = useMemo<Cmd[]>(() => {
     const st = useStore.getState();
     const actions: Cmd[] = [
-      { id: "new", label: "Nueva sesión", hint: "Ctrl+Shift+T", run: () => st.setDialog("new-session") },
-      { id: "settings", label: "Ajustes", hint: "Ctrl+,", run: () => st.setDialog("settings") },
+      { id: "new", label: "New session", hint: "Ctrl+Shift+T", run: () => st.setDialog("new-session") },
+      { id: "settings", label: "Settings", hint: "Ctrl+,", run: () => st.setDialog("settings") },
       {
         id: "sidebar",
-        label: sidebarOpen ? "Ocultar panel lateral" : "Mostrar panel lateral",
+        label: sidebarOpen ? "Hide sidebar" : "Show sidebar",
         hint: "Ctrl+Shift+B",
         run: () => st.toggleSidebar(),
       },
       {
         id: "metrics",
-        label: metricsOpen ? "Ocultar barra de métricas" : "Mostrar barra de métricas",
+        label: metricsOpen ? "Hide metrics bar" : "Show metrics bar",
         hint: "Ctrl+Shift+M",
         run: () => st.toggleMetrics(),
       },
-      { id: "reload", label: "Recargar configuración", hint: "Ctrl+Shift+R", run: () => void st.reloadConfig() },
+      { id: "reload", label: "Reload configuration", hint: "Ctrl+Shift+R", run: () => void st.reloadConfig() },
     ];
     const jumps: Cmd[] = sessions.map((s) => ({
       id: "s:" + s.id,
-      label: "Ir a: " + s.title,
+      label: "Go to: " + s.title,
       hint: s.agent_id,
       run: () => void st.setActive(s.id),
     }));
@@ -75,7 +75,7 @@ export function CommandPalette() {
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Escribe un comando o sesión…"
+            placeholder="Type a command or session…"
             spellCheck={false}
             style={{ flex: 1 }}
             onKeyDown={(e) => {
@@ -95,7 +95,7 @@ export function CommandPalette() {
           />
         </div>
         <div className="dialog-body" style={{ padding: 6 }}>
-          {list.length === 0 && <div className="hint" style={{ padding: 8 }}>Sin resultados.</div>}
+          {list.length === 0 && <div className="hint" style={{ padding: 8 }}>No results.</div>}
           {list.map((c, i) => (
             <div
               key={c.id}

@@ -127,10 +127,10 @@ fn restore(cwd: &Path, hash: &str) -> Result<()> {
 pub fn undo(cwd: &Path) -> Result<String> {
     let (list, pointer) = read_state(cwd);
     if list.is_empty() {
-        return Err(anyhow!("sin checkpoints"));
+        return Err(anyhow!("no checkpoints"));
     }
     if pointer == 0 {
-        return Err(anyhow!("nada que deshacer"));
+        return Err(anyhow!("nothing to undo"));
     }
     let np = pointer - 1;
     let h = list[np].clone();
@@ -143,10 +143,10 @@ pub fn undo(cwd: &Path) -> Result<String> {
 pub fn redo(cwd: &Path) -> Result<String> {
     let (list, pointer) = read_state(cwd);
     if list.is_empty() {
-        return Err(anyhow!("sin checkpoints"));
+        return Err(anyhow!("no checkpoints"));
     }
     if pointer + 1 >= list.len() {
-        return Err(anyhow!("nada que rehacer"));
+        return Err(anyhow!("nothing to redo"));
     }
     let np = pointer + 1;
     let h = list[np].clone();

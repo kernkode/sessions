@@ -19,8 +19,8 @@ type Tab = "general" | "agents" | "performance";
 
 const TAB_LABEL: Record<Tab, string> = {
   general: "General",
-  agents: "Agentes",
-  performance: "Rendimiento",
+  agents: "Agents",
+  performance: "Performance",
 };
 
 const TAB_ICON: Record<Tab, ReactNode> = {
@@ -31,25 +31,25 @@ const TAB_ICON: Record<Tab, ReactNode> = {
 
 // Nombres legibles para los atajos conocidos; el resto se humaniza.
 const KEYBIND_LABEL: Record<string, string> = {
-  new_session: "Nueva sesión",
-  close_session: "Cerrar sesión",
-  next_session: "Sesión siguiente",
-  prev_session: "Sesión anterior",
-  toggle_sidebar: "Mostrar / ocultar panel",
-  toggle_metrics: "Mostrar / ocultar métricas",
-  reload_config: "Recargar configuración",
-  clear_terminal: "Limpiar terminal",
-  find: "Buscar en la terminal",
-  settings: "Abrir ajustes",
+  new_session: "New session",
+  close_session: "Close session",
+  next_session: "Next session",
+  prev_session: "Previous session",
+  toggle_sidebar: "Toggle sidebar",
+  toggle_metrics: "Toggle metrics",
+  reload_config: "Reload configuration",
+  clear_terminal: "Clear terminal",
+  find: "Search in terminal",
+  settings: "Open settings",
 };
 
 const humanize = (k: string) => k.replace(/_/g, " ");
 
 /** Da unidad a los valores numéricos según el sufijo de la clave de config. */
 function fmtValue(key: string, v: unknown): string {
-  if (typeof v === "boolean") return v ? "sí" : "no";
+  if (typeof v === "boolean") return v ? "yes" : "no";
   if (typeof v === "number") {
-    if (key.endsWith("_ms") || key.includes("_ms_")) return v === 0 ? "desactivado" : `${v} ms`;
+    if (key.endsWith("_ms") || key.includes("_ms_")) return v === 0 ? "disabled" : `${v} ms`;
     if (key.endsWith("_kb")) return fmtBytes(v * 1024);
     if (key.endsWith("_bytes")) return fmtBytes(v);
   }
@@ -74,16 +74,16 @@ export function SettingsDialog() {
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className="dialog settings">
         <div className="dialog-head">
-          Ajustes
+          Settings
           <div style={{ flex: 1 }} />
           <button
             className="chip btn"
             onClick={() => void reloadConfig()}
-            title="Volver a leer los .toml"
+            title="Re-read the .toml files"
           >
-            <IconRefresh width={13} height={13} /> Recargar
+            <IconRefresh width={13} height={13} /> Reload
           </button>
-          <button className="icon-btn" onClick={close} title="Cerrar">
+          <button className="icon-btn" onClick={close} title="Close">
             <IconX width={13} height={13} />
           </button>
         </div>
@@ -121,7 +121,7 @@ export function SettingsDialog() {
             v{version} · {platform}
           </span>
           <button className="btn primary" onClick={close}>
-            Cerrar
+            Close
           </button>
         </div>
       </div>
@@ -162,15 +162,15 @@ function PathRow({ label, path, onOpen }: { label: string; path: string; onOpen:
         </div>
       </div>
       <button className="chip btn" onClick={onOpen}>
-        <IconFolder width={12} height={12} /> Abrir
+        <IconFolder width={12} height={12} /> Open
       </button>
     </div>
   );
 }
 
 const Bool = ({ v, onChange }: { v: boolean; onChange: (v: boolean) => void }) => (
-  <button className={`badge ${v ? "ok" : ""}`} title="cambiar" onClick={() => onChange(!v)}>
-    {v ? "sí" : "no"}
+  <button className={`badge ${v ? "ok" : ""}`} title="toggle" onClick={() => onChange(!v)}>
+    {v ? "yes" : "no"}
   </button>
 );
 
@@ -221,41 +221,41 @@ function GeneralTab({
     void useStore.getState().updateAppConfig(patch);
   return (
     <>
-      <Section title="Almacenamiento">
-        <PathRow label="Carpeta de datos" path={paths.root} onOpen={() => open(paths.root)} />
+      <Section title="Storage">
+        <PathRow label="Data folder" path={paths.root} onOpen={() => open(paths.root)} />
         <PathRow label="config.toml" path={paths.config} onOpen={() => open(paths.config)} />
         <PathRow label="agents.toml" path={paths.agents} onOpen={() => open(paths.agents)} />
       </Section>
 
-      <Section title="Aplicación">
-        <Row label="Tema">
+      <Section title="Application">
+        <Row label="Theme">
           <Select value={app.app.theme} options={["dark", "light"]} onChange={(v) => set({ theme: v })} />
         </Row>
-        <Row label="Idioma">
+        <Row label="Language">
           <Select value={app.app.language} options={["es", "en"]} onChange={(v) => set({ language: v })} />
         </Row>
-        <Row label="Restaurar sesiones al abrir">
+        <Row label="Restore sessions on start">
           <Bool v={app.app.restore_sessions} onChange={(v) => set({ restore_sessions: v })} />
         </Row>
-        <Row label="Reanudación automática">
+        <Row label="Auto-resume">
           <Select
             value={app.app.auto_resume}
             options={["active", "all", "none"]}
             onChange={(v) => set({ auto_resume: v })}
           />
         </Row>
-        <Row label="Confirmar al cerrar">
+        <Row label="Confirm on close">
           <Bool v={app.app.confirm_on_close} onChange={(v) => set({ confirm_on_close: v })} />
         </Row>
-        <Row label="Scrollback persistente">
+        <Row label="Persistent scrollback">
           <Bool v={app.app.persist_scrollback} onChange={(v) => set({ persist_scrollback: v })} />
         </Row>
-        <Row label="Relanzar al terminar">
+        <Row label="Relaunch on exit">
           <Bool v={app.app.auto_relaunch} onChange={(v) => set({ auto_relaunch: v })} />
         </Row>
       </Section>
 
-      <Section title="Atajos de teclado">
+      <Section title="Keyboard shortcuts">
         {Object.entries(app.keybinds).map(([k, v]) => (
           <Row key={k} label={KEYBIND_LABEL[k] ?? humanize(k)}>
             <Keys combo={v} />
@@ -270,9 +270,9 @@ function AgentsTab({ agents, onEdit }: { agents: AgentStatus[]; onEdit: () => vo
   return (
     <>
       <div className="agents-head">
-        <span className="hint">Los agentes y su comando se definen en agents.toml.</span>
+        <span className="hint">Agents and their commands are defined in agents.toml.</span>
         <button className="chip btn" onClick={onEdit}>
-          <IconEdit width={12} height={12} /> Editar agents.toml
+          <IconEdit width={12} height={12} /> Edit agents.toml
         </button>
       </div>
       {agents.map((a) => (
@@ -284,12 +284,12 @@ function AgentsTab({ agents, onEdit }: { agents: AgentStatus[]; onEdit: () => vo
             <div className="agent-top">
               <b>{a.name}</b>
               <span className={`badge ${a.installed ? "ok" : "err"}`}>
-                {a.installed ? "instalado" : "no encontrado"}
+                {a.installed ? "installed" : "not found"}
               </span>
-              {a.metrics && <span className="badge">métricas de tokens</span>}
+              {a.metrics && <span className="badge">token metrics</span>}
             </div>
             <div className={`agent-path ${a.path ? "" : "missing"}`} title={a.path ?? undefined}>
-              {a.path ?? "revisa el PATH o ajusta command en agents.toml"}
+              {a.path ?? "check PATH or set command in agents.toml"}
             </div>
           </div>
         </div>
@@ -310,10 +310,10 @@ function PerformanceTab({ app }: { app: AppConfig }) {
 
   return (
     <>
-      <Section title="Rendimiento">{rows(app.performance)}</Section>
+      <Section title="Performance">{rows(app.performance)}</Section>
       <Section title="Terminal">{rows(app.terminal)}</Section>
       <p className="hint">
-        Estos valores se editan en config.toml y se aplican con el botón Recargar.
+        These values are edited in config.toml and applied with the Reload button.
       </p>
     </>
   );

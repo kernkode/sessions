@@ -61,11 +61,11 @@ pub fn spawn_agent_installer(config: Arc<ConfigStore>) {
                 let prog = match resolve(prog) {
                     Some(p) => p,
                     None => {
-                        eprintln!("Sessions: «{}» sin instalador disponible ({prog} no está en PATH)", a.id);
+                        eprintln!("Sessions: '{}' has no available installer ({prog} not on PATH)", a.id);
                         continue;
                     }
                 };
-                eprintln!("Sessions: instalando «{}»…", a.id);
+                eprintln!("Sessions: installing '{}'…", a.id);
                 match std::process::Command::new(prog)
                     .args(args)
                     .env("PATH", &path)
@@ -73,13 +73,13 @@ pub fn spawn_agent_installer(config: Arc<ConfigStore>) {
                     .env("npm_config_audit", "false")
                     .output()
                 {
-                    Ok(out) if out.status.success() => eprintln!("Sessions: «{}» instalado.", a.id),
+                    Ok(out) if out.status.success() => eprintln!("Sessions: '{}' installed.", a.id),
                     Ok(out) => eprintln!(
-                        "Sessions: no se pudo instalar «{}»: {}",
+                        "Sessions: could not install '{}': {}",
                         a.id,
                         String::from_utf8_lossy(&out.stderr).trim()
                     ),
-                    Err(e) => eprintln!("Sessions: no se pudo instalar «{}»: {e}", a.id),
+                    Err(e) => eprintln!("Sessions: could not install '{}': {e}", a.id),
                 }
             }
         });
@@ -92,7 +92,7 @@ fn ensure_node() -> Option<String> {
         return None;
     }
     if let Some(winget) = crate::config::agents::which("winget") {
-        eprintln!("Sessions: npm no encontrado; instalando Node.js LTS (winget)…");
+        eprintln!("Sessions: npm not found; installing Node.js LTS (winget)…");
         let _ = std::process::Command::new(winget)
             .args([
                 "install",

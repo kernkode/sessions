@@ -139,7 +139,7 @@ impl SessionManager {
                     let _ = tx.send(PumpMsg::Exit(s.id.clone(), code));
                 }
             })
-            .map_err(|e| anyhow!("no se pudo crear el hilo lector: {e}"))?;
+            .map_err(|e| anyhow!("could not create the reader thread: {e}"))?;
 
         Ok(session)
     }

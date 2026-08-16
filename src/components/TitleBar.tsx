@@ -21,41 +21,41 @@ export function TitleBar() {
           Sessions
         </div>
         <div className="tabs">
-          <span className="tab on">Sesiones</span>
-          <span className="chip" title="Sesiones con proceso vivo">
+          <span className="tab on">Sessions</span>
+          <span className="chip" title="Sessions with a live process">
             <span className={`dot ${aliveCount > 0 ? "working" : "exited"}`} />
-            {aliveCount} activa{aliveCount === 1 ? "" : "s"}
+            {aliveCount} live
           </span>
         </div>
       </div>
 
       <button
         className="icon-btn acc"
-        title="Nueva sesión (Ctrl+Shift+T)"
+        title="New session (Ctrl+Shift+T)"
         onClick={() => setDialog("new-session")}
       >
         <IconPlus />
       </button>
-      <button className="icon-btn" title="Barra lateral (Ctrl+Shift+B)" onClick={toggleSidebar}>
+      <button className="icon-btn" title="Sidebar (Ctrl+Shift+B)" onClick={toggleSidebar}>
         <IconPanel />
       </button>
-      <button className="icon-btn" title="Métricas (Ctrl+Shift+M)" onClick={toggleMetrics}>
+      <button className="icon-btn" title="Metrics (Ctrl+Shift+M)" onClick={toggleMetrics}>
         <IconChart />
       </button>
-      <button className="icon-btn" title={`Ajustes · v${version}`} onClick={() => setDialog("settings")}>
+      <button className="icon-btn" title={`Settings · v${version}`} onClick={() => setDialog("settings")}>
         <IconGear />
       </button>
 
       <div className="win-btns">
-        <button className="win-btn" onClick={() => void win.minimize()} title="Minimizar">
+        <button className="win-btn" onClick={() => void win.minimize()} title="Minimize">
           <IconMin />
         </button>
-        <button className="win-btn" onClick={() => void win.toggleMaximize()} title="Maximizar">
+        <button className="win-btn" onClick={() => void win.toggleMaximize()} title="Maximize">
           <IconMax />
         </button>
         <button
           className="win-btn close"
-          title="Cerrar"
+          title="Close"
           onClick={async () => {
             // Orderly shutdown: saves scrollback and kills the child processes.
             await api.appShutdown().catch(() => {});

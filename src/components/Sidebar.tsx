@@ -84,11 +84,11 @@ export function Sidebar() {
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filtrar sesiones…"
+            placeholder="Filter sessions…"
             spellCheck={false}
           />
         </div>
-        <button className="icon-btn" title="Añadir proyecto" onClick={() => setDialog("new-session")}>
+        <button className="icon-btn" title="Add project" onClick={() => setDialog("new-session")}>
           <IconPlus />
         </button>
       </div>
@@ -96,7 +96,7 @@ export function Sidebar() {
       <div className="sidebar-list">
         {groups.length === 0 && (
           <div className="hint" style={{ padding: "10px 6px" }}>
-            Sin proyectos todavía. Crea una sesión para empezar.
+            No projects yet. Create a session to get started.
           </div>
         )}
 
@@ -106,13 +106,13 @@ export function Sidebar() {
               <button
                 onClick={() => void toggleProject(project.id)}
                 style={{ display: "grid", placeItems: "center", opacity: 1 }}
-                title={project.collapsed ? "Expandir" : "Plegar"}
+                title={project.collapsed ? "Expand" : "Collapse"}
               >
                 <IconChevron open={!project.collapsed} width={13} height={13} />
               </button>
               <span className="name">{project.name}</span>
               <button
-                title="Nueva sesión en este proyecto"
+                title="New session in this project"
                 onClick={() => {
                   useStore.setState({ dialog: "new-session" });
                   window.dispatchEvent(
@@ -123,16 +123,16 @@ export function Sidebar() {
                 <IconPlus width={13} height={13} />
               </button>
               <button
-                title="Renombrar proyecto"
+                title="Rename project"
                 onClick={() => {
-                  const n = window.prompt("Nombre del proyecto", project.name);
+                  const n = window.prompt("Project name", project.name);
                   if (n && n.trim() && n.trim() !== project.name)
                     void renameProject(project.id, n.trim());
                 }}
               >
                 <IconEdit width={13} height={13} />
               </button>
-              <button title="Quitar proyecto y sus sesiones" onClick={() => setPendingRemoval(project.id)}>
+              <button title="Remove project and its sessions" onClick={() => setPendingRemoval(project.id)}>
                 <IconTrash width={13} height={13} />
               </button>
             </div>
@@ -140,7 +140,7 @@ export function Sidebar() {
             {pendingRemoval === project.id && (
               <div className="confirm-row">
                 <span>
-                  Quitar «{project.name}» y sus {list.length} sesión(es)
+                  Remove “{project.name}” and its {list.length} session(s)
                 </span>
                 <button className="chip btn" onClick={() => setPendingRemoval(null)}>
                   No
@@ -152,7 +152,7 @@ export function Sidebar() {
                     void removeProject(project.id);
                   }}
                 >
-                  Sí
+                  Yes
                 </button>
               </div>
             )}
@@ -182,12 +182,12 @@ function SessionCard({ s, on, onClick }: { s: SessionMeta; on: boolean; onClick:
   const status = m?.status ?? s.status;
   const label =
     status === "working"
-      ? "Trabajando"
+      ? "Working"
       : status === "idle"
-        ? "En espera"
+        ? "Idle"
         : status === "error"
           ? "Error"
-          : "Terminada";
+          : "Ended";
 
   return (
     <div className={`card ${on ? "on" : ""}`} onClick={onClick} title={s.command_line ?? s.title}>

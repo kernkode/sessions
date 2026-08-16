@@ -107,7 +107,7 @@ fn build_snapshot(paths: &Paths) -> ConfigSnapshot {
     if agents.is_empty() {
         issues.push(ConfigIssue {
             file: "agents.toml".into(),
-            message: "no hay agentes habilitados; se cargan los de fábrica".into(),
+            message: "no enabled agents; loading the factory ones".into(),
         });
         if let Ok(f) = toml::from_str::<AgentsFile>(agents::DEFAULT_AGENTS_TOML) {
             agents = f.agents.into_iter().filter(|a| a.enabled).collect();
@@ -140,7 +140,7 @@ where
     let raw = match fs::read_to_string(path) {
         Ok(r) => r,
         Err(e) => {
-            issues.push(ConfigIssue { file: name, message: format!("no se pudo leer: {e}") });
+            issues.push(ConfigIssue { file: name, message: format!("could not be read: {e}") });
             return toml::from_str(fallback).unwrap_or_default();
         }
     };
@@ -149,7 +149,7 @@ where
         Err(e) => {
             issues.push(ConfigIssue {
                 file: name,
-                message: format!("TOML inválido, usando valores de fábrica: {e}"),
+                message: format!("invalid TOML, using factory defaults: {e}",),
             });
             toml::from_str(fallback).unwrap_or_default()
         }

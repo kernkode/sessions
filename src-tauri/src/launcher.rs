@@ -30,11 +30,11 @@ pub struct LaunchPlan {
 pub fn plan(cfg: &ConfigStore, req: &CreateSessionRequest) -> Result<LaunchPlan> {
     let agent = cfg
         .agent(&req.agent_id)
-        .ok_or_else(|| anyhow!("el agente «{}» no está definido en agents.toml", req.agent_id))?;
+        .ok_or_else(|| anyhow!("agent '{}' is not defined in agents.toml", req.agent_id))?;
 
     let program = agent.resolve_program().ok_or_else(|| {
         anyhow!(
-            "no se encontró el ejecutable «{}» del agente «{}» en el PATH",
+            "executable '{}' for agent '{}' not found on PATH",
             agent.platform_command(),
             agent.id
         )
@@ -75,11 +75,11 @@ fn resolve_cwd(cfg: &ConfigStore, req: &CreateSessionRequest) -> Result<PathBuf>
         .or_else(|| req.project_path.clone())
         .or_else(|| cfg.app_config().defaults.cwd.clone())
         .or_else(|| dirs::home_dir().map(|p| p.display().to_string()))
-        .ok_or_else(|| anyhow!("no se pudo determinar el directorio de trabajo"))?;
+        .ok_or_else(|| anyhow!("could not determine the working directory"))?;
 
     let p = PathBuf::from(&candidate);
     if !p.is_dir() {
-        return Err(anyhow!("el directorio de trabajo «{candidate}» no existe"));
+        return Err(anyhow!("working directory '{candidate}' does not exist"));
     }
     Ok(p)
 }
@@ -185,7 +185,7 @@ ANTHROPIC_BASE_URL = "agent-value"
 
         let mut req = request("claude");
         req.cwd = Some("Z:/path/that/does/not/exist/12345".into());
-        assert!(plan(&cfg, &req).unwrap_err().to_string().contains("no existe"));
+        assert!(plan(&cfg, &req).unwrap_err().to_string().contains("does not exist"));
         std::fs::remove_dir_all(dir).ok();
     }
 

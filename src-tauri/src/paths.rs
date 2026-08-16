@@ -25,7 +25,7 @@ impl Paths {
         let root = match std::env::var_os("SESSIONS_HOME") {
             Some(v) if !v.is_empty() => PathBuf::from(v),
             _ => dirs::home_dir()
-                .context("no se pudo determinar el directorio HOME")?
+                .context("could not determine the HOME directory")?
                 .join(ROOT_DIR),
         };
         Ok(Self::from_root(root))

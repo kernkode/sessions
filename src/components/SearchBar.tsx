@@ -13,6 +13,13 @@ export function SearchBar() {
 
   useEffect(() => ref.current?.focus(), []);
 
+  // Live search: re-find as the user types, without needing Enter.
+  useEffect(() => {
+    if (!activeId || !text) return;
+    const t = window.setTimeout(() => pool.findNext(activeId, text), 150);
+    return () => window.clearTimeout(t);
+  }, [text, activeId]);
+
   if (!activeId) return null;
 
   const find = (dir: 1 | -1) => {
@@ -27,7 +34,7 @@ export function SearchBar() {
       <input
         ref={ref}
         value={text}
-        placeholder="Buscar…"
+        placeholder="Search…"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") find(e.shiftKey ? -1 : 1);
@@ -37,10 +44,10 @@ export function SearchBar() {
           }
         }}
       />
-      <button className="icon-btn" onClick={() => find(-1)} title="Anterior (Shift+Enter)">
+      <button className="icon-btn" onClick={() => find(-1)} title="Previous (Shift+Enter)">
         ↑
       </button>
-      <button className="icon-btn" onClick={() => find(1)} title="Siguiente (Enter)">
+      <button className="icon-btn" onClick={() => find(1)} title="Next (Enter)">
         ↓
       </button>
       <button

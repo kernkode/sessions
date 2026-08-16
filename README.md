@@ -1,345 +1,308 @@
 # Sessions
 
-Consola de escritorio para gestionar varias sesiones de agentes CLI —**Claude Code**,
-**Codex**, **OpenCode**, **pi**— en una sola ventana, con métricas de tokens en vivo
-(tok/s, ventana de contexto, coste) y configuración por TOML en
-`~/.sessions`.
+A desktop console to run and watch several CLI coding agents — **Claude Code**,
+**Codex**, **pi** and a plain terminal — in one window, with live token metrics
+(tok/s, context window, cost) and TOML configuration under `~/.sessions`.
 
-El modelo, el proveedor y las claves los gestiona cada CLI con su propia
-configuración; esta app solo lanza el proceso, lo mantiene vivo y lee su telemetría.
+Models, providers and credentials are managed by each CLI with its own config;
+this app only launches the process, keeps it alive and reads its telemetry.
 
-Tauri 2 (Rust) + React. El binario ocupa unos pocos MB y la app arranca en
-~30 MB de RAM, en lugar de los cientos que consume una alternativa basada en
-Electron.
+Built with Tauri 2 (Rust) + React. The binary is a few MB and the app idles at
+~30 MB of RAM instead of the hundreds an Electron-based alternative would use.
 
 ---
 
-## Requisitos
+## Requirements
 
-| Herramienta | Para qué |
+| Tool | What for |
 |---|---|
-| Node 20+ y npm | interfaz (Vite + React) |
-| Rust estable 1.77+ | backend Tauri |
-| WebView2 (Windows) · WebKitGTK (Linux) | motor de la ventana |
-| Los CLIs que quieras usar | `claude`, `codex`, `opencode`, `pi`… deben estar en el PATH |
+| Node 20+ and npm | frontend (Vite + React) |
+| Stable Rust 1.77+ | Tauri backend |
+| WebView2 (Windows) · WebKitGTK (Linux) | window engine |
+| The CLIs you want to use | `claude`, `codex`, `pi`… on the PATH (or auto-installed, see below) |
 
-## Puesta en marcha
+If Node or a CLI is missing, the app tries to install it on first launch
+(`winget` for Node, `npm i -g` for the agents that declare an `install` argv).
+
+## Getting started
 
 ```bash
 npm install
-npm run app:dev        # desarrollo con recarga en caliente
-npm run app:build      # instalador / binario de producción
+npm run app:dev        # development with hot reload
+npm run app:build      # production installer / binary
 ```
 
-Otros comandos útiles:
+Other useful commands:
 
 ```bash
-npm run build          # comprueba tipos y compila la interfaz
-npm run rs:test        # pruebas del backend (70 en total)
-npm run icons          # regenera el juego de iconos
-npm run dev:free       # libera el puerto 5273 si quedó un Vite anterior
+npm run build          # type-check and build the frontend
+npm run rs:test        # backend tests (70 unit + 4 e2e)
+node scripts/ui-e2e.mjs # frontend e2e assertions over the running app (CDP)
+npm run icons          # regenerate the icon set
+npm run dev:free       # free port 5273 if a previous Vite is still alive
 ```
 
 ---
 
-## Estructura
+## Layout
 
-El código (identificadores, comentarios y pruebas) está en inglés; los textos de
-la interfaz, los mensajes de error y los comentarios de los `.toml` de
-`~/.sessions` están en español, que es lo que se lee al usar la app.
+Code (identifiers, comments, tests) and all user-facing text are in English.
 
 ```
 sessions/
-├─ src/                     interfaz (React + TypeScript)
-│  ├─ term/pool.ts          piscina de terminales xterm (fuera de React)
-│  ├─ state/store.ts        estado global (zustand)
-│  ├─ components/           barra de título, lateral, métricas, diálogos
-│  └─ lib/                  IPC, tipos y formateo
+├─ src/                     frontend (React + TypeScript)
+│  ├─ term/pool.ts          xterm terminal pool (outside React)
+│  ├─ state/store.ts        global state (zustand)
+│  ├─ components/           title bar, sidebar, metrics, dialogs, palette
+│  └─ lib/                  IPC, types, formatting
 ├─ src-tauri/
-│  ├─ src/pty/              PTY, buffer circular y bomba de salida
-│  ├─ src/metrics/          lectores de tokens por agente
-│  ├─ src/config/           carga y validación de los TOML
-│  ├─ src/launcher.rs       agente → comando, argumentos y entorno
-│  ├─ src/store.rs          proyectos, sesiones y scrollback
-│  ├─ src/commands.rs       API expuesta a la interfaz
-│  └─ assets/*.default.toml plantillas que se copian a ~/.sessions
-└─ scripts/                 iconos, sondas de interfaz y utilidades
+│  ├─ src/pty/              PTY, ring buffer and output pump
+│  ├─ src/metrics/          per-agent token readers (claude, codex, pi)
+│  ├─ src/config/           TOML loading and validation
+│  ├─ src/git.rs            opencode-style checkpoints (undo/redo)
+│  ├─ src/launcher.rs       agent → command, arguments and environment
+│  ├─ src/store.rs          projects, sessions and scrollback
+│  ├─ src/commands.rs       API exposed to the frontend
+│  └─ assets/*.default.toml templates copied to ~/.sessions
+└─ scripts/                 icons, UI probes and the frontend e2e
 ```
 
 ---
 
 ## `~/.sessions`
 
-Se crea en el primer arranque y **no se sobrescribe** después:
+Created on first launch and **never overwritten** afterwards:
 
 ```
 ~/.sessions/
-├─ config.toml           apariencia, terminal, rendimiento, reanudación, atajos
-├─ agents.toml           CLIs que la app puede lanzar
-├─ state/projects.json   proyectos y sesiones registradas
-├─ scrollback/           historial por sesión
+├─ config.toml           appearance, terminal, performance, resume, shortcuts
+├─ agents.toml           CLIs the app can launch
+├─ state/projects.json   registered projects and sessions
+├─ scrollback/           per-session history
 └─ logs/
 ```
 
-`SESSIONS_HOME=/otra/ruta` permite usar otra ubicación (útil para pruebas o para
-un uso portable).
+`SESSIONS_HOME=/other/path` uses a different location (handy for tests or a
+portable setup).
 
-Tras editar cualquier `.toml`, aplica los cambios con **Ctrl+Shift+R** o el botón
-*Recargar* de Ajustes. Un fichero con errores no impide arrancar: la app avisa del
-problema y usa los valores de fábrica.
+After editing any `.toml`, apply changes with **Ctrl+Shift+R** or the *Reload*
+button in Settings. A broken file never blocks startup: the app reports the
+problem and falls back to factory defaults.
 
-### Proveedores, modelos y claves
+### Providers, models and keys
 
-No los gestiona esta app: los configura cada CLI donde ya lo hacía
-(`claude`, `codex`, `opencode`, `pi` tienen sus propios ajustes y su propio
-almacén de credenciales). Por eso `agents.toml` solo describe **cómo lanzar el
-proceso**: ejecutable, argumentos y variables de entorno fijas. Si necesitas
-apuntar un CLI a un *gateway* propio, hazlo con su configuración o con
+Not managed here: each CLI configures them where it always has. `agents.toml`
+only describes **how to launch the process**: executable, arguments and fixed
+environment variables. Point a CLI at your own gateway via its config or
 `[agent.env]`.
 
-#### Cuando hace falta bajar al detalle
-
-`[agent.env]` es la vía para variables fijas del proceso (`FORCE_COLOR`, un
-`ANTHROPIC_BASE_URL` que apunte a tu *gateway*, un token que ya tengas en el
-entorno). Y `extra_args` de la petición añade argumentos sueltos a un lanzamiento
-concreto sin tocar el fichero.
-
-### Agentes
+### Agents
 
 ```toml
 [[agent]]
 id = "claude"
 name = "Claude Code"
 command = "claude"
-command_windows = "claude.cmd"      # los shims de npm en Windows son .cmd
+command_windows = "claude.cmd"      # npm shims on Windows are .cmd
 resume_args = ["--resume", "{session_id}"]
 continue_args = ["--continue"]
-metrics = "claude-jsonl"            # de dónde salen los tokens
-
-[agent.env]
-FORCE_COLOR = "1"
+install = ["npm", "install", "-g", "@anthropic-ai/claude-code"]
+metrics = "claude-jsonl"            # where the tokens come from
 ```
 
-`metrics` admite `claude-jsonl`, `codex-rollout`, `opencode-sqlite` o `none`.
-Añadir un CLI nuevo es solo otro bloque `[[agent]]`; si no publica telemetría
-—como `pi` ahora mismo—, la app sigue mostrando su actividad y el rendimiento de
-salida. De fábrica vienen Claude Code, Codex, OpenCode, pi y una terminal normal
-para git, builds y comandos sueltos.
-
-`enabled = false` mantiene un bloque en el fichero sin ofrecerlo en la interfaz.
+`metrics` accepts `claude-jsonl`, `codex-rollout`, `pi-jsonl` or `none`. Adding a
+new CLI is just another `[[agent]]` block; agents without telemetry still show
+activity and output throughput. Factory agents: Claude Code, Codex, pi and a
+normal terminal for git, builds and one-off commands. `enabled = false` keeps a
+block in the file without offering it in the UI.
 
 ---
 
-## Métricas: de dónde salen
+## Metrics: where they come from
 
-No se estiman: se leen del propio registro de cada agente.
+They are not estimated; they are read from each agent's own log.
 
-| Agente | Origen | Datos |
+| Agent | Source | Data |
 |---|---|---|
-| Claude Code | `~/.claude/projects/<cwd>/<id>.jsonl` | `message.usage` por turno (entrada, salida, caché, *thinking*), modelo |
-| Codex | `~/.codex/sessions/AAAA/MM/DD/rollout-*.jsonl` | eventos `token_count`, `model_context_window`, modelo del turno |
-| OpenCode | `~/.local/share/opencode/opencode.db` (solo lectura) | acumulados de la tabla `session`, coste |
-| pi, terminal | — | actividad y bytes/s del PTY |
+| Claude Code | `~/.claude/projects/<cwd>/<id>.jsonl` | per-turn `message.usage` (input, output, cache, thinking), model, effort |
+| Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | `token_count` events, `model_context_window`, turn model |
+| pi | `~/.pi/agent/sessions/<cwd>/<ts>_<id>.jsonl` | per-message usage, model, thinking level |
+| terminal | — | PTY activity and bytes/s |
 
-Los ficheros se leen de forma incremental por desplazamiento, nunca completos, y
-el sondeo se adapta: rápido mientras la sesión produce salida, lento en reposo.
+Files are read incrementally by offset, never whole, and polling adapts: fast
+while the session produces output, slow at rest.
 
-* **tok/s** — tokens de salida del último turno entre su duración, suavizado con
-  media móvil. Se muestra también el pico.
-* **Ventana de contexto** y **modelo** — los que reporte el agente; si no los
-  reporta, no se muestran.
-* **Coste** — el que informe el agente.
-* **Bytes/s de salida del PTY** — señal de actividad válida incluso con agentes sin
-  telemetría propia.
+* **tok/s** — output tokens of the last turn over its duration, smoothed with a
+  moving average; the peak is shown too.
+* **Context window** and **model** — whatever the agent reports; hidden otherwise.
+* **Cost** — whatever the agent reports.
+* **PTY bytes/s** — an activity signal valid even for agents without telemetry.
 
-El backend también puede medir CPU y RAM del árbol de procesos de cada sesión,
-pero la barra ya no los muestra y el muestreo viene desactivado
-(`process_sample_ms = 0`): activarlo obliga a enumerar todos los procesos de la
-máquina en cada ciclo.
+"Working" is detected from the agent's busy hints (spinner/text) with a fallback
+on recent JSONL activity, so a CLI update that changes the spinner does not
+silently break it.
 
-### Al reabrir la app: reanudación automática
+### Auto-resume and auto-relaunch
 
-Los procesos no sobreviven al cierre, así que al arrancar la app vuelve a lanzar
-las sesiones guardadas por su cuenta: con los agentes que lo admiten reanuda la
-conversación (`claude --resume <id>`, `codex resume <id>`) y el resto arrancan de
-cero en el mismo directorio. No hay que pulsar nada.
+Processes do not survive a restart, so on launch the app relaunches saved
+sessions on its own: agents that support it resume the conversation
+(`claude --resume <id>`, `codex resume <id>`); the rest start fresh in the same
+directory.
 
 ```toml
 [app]
-restore_sessions = true     # interruptor general
-auto_resume = "active"      # active (la última usada) | all (todas) | none
+restore_sessions = true     # master switch
+auto_resume = "active"      # active (last used) | all | none
+auto_relaunch = true        # relaunch a session whose process ended on its own
 ```
 
-`active` es el valor por defecto a propósito: cada agente es un proceso Node que
-puede rondar los 700 MB, así que `all` conviene solo si trabajas con pocas
-sesiones. Con `none` (o `restore_sessions = false`) las sesiones aparecen como
-*Terminada* y se reabren a mano.
+`active` is the default on purpose: each agent is a Node process that can hover
+around 700 MB, so `all` only makes sense with few sessions. With `none` (or
+`restore_sessions = false`) sessions appear as *Ended* and reopen manually.
 
-La sesión reanudada recibe un id nuevo y sustituye al registro anterior. Si el
-lanzamiento falla —el CLI ya no está en el PATH, el directorio se movió— el
-registro **no** se pierde: la app avisa del motivo y la sesión se queda como
-terminada, lista para reintentarlo.
+If a relaunch fails — the CLI is gone from PATH, the directory moved — the record
+is **not** lost: the app reports the reason and the session stays *Ended*, ready
+to retry.
 
-### Sesiones que no se reanudan
+### Sessions that are not resumed
 
-Con `auto_resume = "none"`, o si la reanudación falla, la sesión aparece como
-*Terminada* y se muestra su última pantalla. Esa salida no se reproduce tal cual:
-los agentes dibujan con posicionamiento absoluto y secuencias como `CSI ?25l`
-(ocultar cursor), de modo que escribir esos bytes en un terminal nuevo de otro
-tamaño se vería roto y sin cursor.
-
-En su lugar se reconstruye la pantalla: los bytes se reproducen en un emulador
-fuera de pantalla del tamaño original y se serializa su búfer, así que se ve la
-última pantalla real con sus colores. Un aviso indica que ese registro no acepta
-escritura y ofrece **Relanzar** (proceso nuevo) o **Reanudar** (`--resume` con el
-id de sesión del CLI). Si escribes de todas formas, la app lo dice en lugar de
-tragarse la pulsación.
+An ended session shows its last real screen, rebuilt by replaying the bytes in an
+off-screen emulator of the original size and serialising its buffer (raw replay
+would look broken: agents draw with absolute positioning and sequences like
+`CSI ?25l`). A notice explains the transcript does not accept input and offers
+**Relaunch** (fresh process) or **Resume** (`--resume` with the CLI session id).
 
 ---
 
-## Rendimiento
+## Git checkpoints (undo/redo)
 
-El pipeline de salida está pensado para agentes que escriben mucho y muy a menudo:
-
-```
-[hilo lector/sesión] read(64K) ─► buffer circular (rehidratación)
-        └─ canal acotado ─► [1 hilo bomba] agrupa por sesión y envía cada
-                             flush_interval_ms o al llegar a max_chunk_bytes
-                             ─► canal binario ─► xterm.write()
-[1 hilo supervisor] try_wait() cada 300 ms ─► evento de fin + cierre de handles
-```
-
-* **Coalescencia**: miles de escrituras pequeñas se convierten en ~80 mensajes
-  por segundo y sesión. Verificado en pruebas (300 líneas → menos de 100 mensajes).
-* **Transporte binario**: la salida viaja como bytes por un `Channel` de Tauri, sin
-  serializar a JSON ni volver a decodificar.
-* **Un solo hilo de salida y uno de supervisión** para todas las sesiones, más un
-  lector por PTY; el número de hilos no crece con la carga.
-* **Cola acotada**: si la interfaz se atasca, los lectores se frenan en lugar de
-  consumir memoria sin límite.
-* **React fuera del camino caliente**: la salida va directa a xterm; las tarjetas
-  de la barra lateral se suscriben solo a sus propias métricas.
-* **Terminales que no se re-montan**: cada sesión conserva su instancia de xterm
-  y se oculta con CSS; las de sesiones terminadas se liberan por LRU
-  (`max_live_terminals`) y se rehidratan desde el buffer circular.
-* **Renderizador WebGL** con `addon-webgl`, con caída a DOM si no hay contexto.
-* **Tipografías empaquetadas** (Inter variable e JetBrains Mono, ~150 KB de woff2
-  en total): no dependen de lo instalado en el sistema y las métricas del terminal
-  son idénticas en cualquier equipo. Al terminar de cargar se rehacen las medidas
-  de xterm, para que las columnas no se calculen con la fuente de reserva.
-
-Todo esto se ajusta en `[performance]` y `[terminal]` de `config.toml`; los
-valores se acotan al cargarlos para que una edición desafortunada no degrade la app.
-
-### Nota sobre ConPTY (Windows)
-
-Dos comportamientos condicionan el diseño y están cubiertos por pruebas:
-
-1. ConPTY emite `ESC[6n` al arrancar y **no produce salida hasta recibir
-   respuesta**. La contesta el propio emulador: por eso el terminal de una sesión
-   viva nunca se libera, y al rehidratar el historial la respuesta se regenera.
-2. El lector del PTY **no recibe EOF** cuando el proceso hijo termina. El fin se
-   detecta con `try_wait` desde el supervisor, que además cierra los handles y así
-   desbloquea el hilo lector.
-
-De ahí sale una regla que no es evidente: **el historial y el flujo en vivo no
-pueden solaparse**. Enganchar un terminal es por eso una operación del hilo de
-salida, que toma la instantánea y la marca de bytes juntas y descarta lo que la
-instantánea ya cubría. Si un fragmento se entregase dos veces, el `ESC[6n`
-duplicado haría que el emulador respondiera dos veces, y esa segunda respuesta
-aparecería como un carácter suelto en el prompt del agente.
+Each session's workspace is snapshotted as `sessions-checkpoint:` commits; the
+header shows the branch with ↩/↪ buttons to move between checkpoints
+(`reset --hard` + `clean -fd`, with a confirmation when the tree is dirty). The
+`.sessions/` directory is excluded from checkpoints via `.git/info/exclude`. A
+checkpoint is also taken automatically before relaunching a session.
 
 ---
 
-## Atajos
+## Performance
 
-| Atajo | Acción |
+The output pipeline is designed for agents that write a lot, very often:
+
+```
+[reader thread/session] read(64K) ─► ring buffer (rehydration)
+        └─ bounded channel ─► [1 pump thread] coalesces per session and sends
+                              every flush_interval_ms or at max_chunk_bytes
+                              ─► binary channel ─► xterm.write()
+[1 supervisor thread] try_wait() every 300 ms ─► exit event + handle close
+```
+
+* **Coalescing**: thousands of small writes become ~80 messages/s per session.
+* **Binary transport**: output travels as bytes over a Tauri `Channel`, no JSON
+  round-trip.
+* **One pump and one supervisor thread** for all sessions, plus one reader per
+  PTY; thread count does not grow with load.
+* **Bounded queue**: if the UI stalls, readers slow down instead of eating memory.
+* **React off the hot path**: output goes straight to xterm; sidebar cards
+  subscribe only to their own metrics.
+* **Terminals are never re-mounted**: each session keeps its xterm instance and
+  is hidden with CSS; ended ones are released by LRU (`max_live_terminals`) and
+  rehydrated from the ring buffer.
+* **WebGL renderer** with DOM fallback.
+* **Bundled fonts** (Inter variable + JetBrains Mono): identical terminal metrics
+  on any machine; xterm re-measures once the fonts finish loading.
+
+All of this is tuned in `[performance]` and `[terminal]` of `config.toml`; values
+are clamped on load so an unlucky edit cannot degrade the app.
+
+### ConPTY (Windows) notes
+
+1. ConPTY emits `ESC[6n` at startup and produces **no output until answered**.
+   The emulator itself answers, which is why a live session's terminal is never
+   released and the answer is regenerated on rehydration.
+2. The PTY reader **never sees EOF** when the child exits; the supervisor detects
+   the end with `try_wait` and closes the handles, unblocking the reader.
+
+Hence history and the live stream must never overlap: attaching is an output-
+thread operation that takes the snapshot and the byte mark together.
+
+---
+
+## Shortcuts
+
+| Shortcut | Action |
 |---|---|
-| `Ctrl+Shift+T` | nueva sesión |
-| `Ctrl+Shift+W` | cerrar la sesión activa |
-| `Ctrl+Tab` / `Ctrl+Shift+Tab` | sesión siguiente / anterior |
-| `Ctrl+Shift+B` | barra lateral |
-| `Ctrl+Shift+M` | barra de métricas |
-| `Ctrl+Shift+F` | buscar en el terminal |
-| `Ctrl+Shift+K` | limpiar el terminal |
-| `Ctrl+Shift+R` | recargar la configuración |
-| `Ctrl+,` | ajustes |
+| `Ctrl+Shift+T` | new session |
+| `Ctrl+Shift+W` | close the active session |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | next / previous session |
+| `Ctrl+Shift+B` | sidebar |
+| `Ctrl+Shift+M` | metrics bar |
+| `Ctrl+Shift+F` | search in the terminal (live as you type) |
+| `Ctrl+Shift+K` | clear the terminal |
+| `Ctrl+Shift+R` | reload configuration |
+| `Ctrl+,` | settings |
+| `Ctrl+K` | command palette |
 
-Se usan combinaciones con Shift a propósito: `Ctrl+C`, `Ctrl+R`, `Ctrl+W` o
-`Ctrl+F` pertenecen al agente y llegan intactas al PTY.
+Shift combos are used on purpose: `Ctrl+C`, `Ctrl+R`, `Ctrl+W` and `Ctrl+F`
+belong to the agent and reach the PTY untouched.
 
 ---
 
-## Pruebas
+## Testing
 
 ```bash
-npm run rs:test     # 66 unitarias + 4 de extremo a extremo
-npm run build       # tipos + interfaz
+npm run rs:test      # 70 unit + 4 end-to-end (Rust)
+npm run build        # types + frontend
+node scripts/ui-e2e.mjs   # frontend assertions over the running app
 ```
 
-Cubren el parseo de los TOML de fábrica, la construcción del comando y el entorno
-de cada agente, el buffer circular, el ciclo de vida del PTY (incluidos el diálogo
-DSR de ConPTY y la detección de fin sin EOF), la coalescencia de salida, los tres
-lectores de métricas, la persistencia y la recarga en caliente.
-
-Para inspeccionar o automatizar la interfaz real dentro de WebView2:
+They cover factory TOML parsing, per-agent command/environment building, the
+ring buffer, the PTY lifecycle (ConPTY DSR dialogue and EOF-less exit detection),
+output coalescing, the metrics readers, git checkpoints, persistence and hot
+reload. To inspect or drive the real UI inside WebView2:
 
 ```bash
-npm run app:dev     # en otra terminal
-WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 \
-  ./src-tauri/target/debug/sessions.exe
+WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222 npm run app:dev
 node scripts/ui-probe.mjs "document.body.innerText"
-node scripts/ui-probe.mjs --type $'echo hola\r'
-node scripts/ui-shot.mjs captura.png
+node scripts/ui-shot.mjs capture.png
 ```
 
 ---
 
-## Problemas frecuentes
+## Common problems
 
-**`Error: Port 5273 is already in use`** al lanzar `npm run app:dev`.
-Ha quedado un servidor de desarrollo anterior vivo. El puerto es fijo a
-propósito (`strictPort`): la ventana apunta a esa URL exacta, y si Vite se
-moviera a otro puerto la app cargaría en blanco. Para liberarlo:
-
-```bash
-npm run dev:free      # mata el proceso node que tenga el 5273, y solo ese
-```
-
-El script comprueba el nombre de imagen antes de matar nada: si el puerto lo
-ocupa otro programa, lo dice y no lo toca. A propósito no está enganchado como
-`predev`: matar procesos desde dentro del propio `npm run dev` puede tumbar la
-cadena que acaba de arrancar.
-
-Si prefieres otro puerto, cámbialo en los dos sitios que deben coincidir:
-`server.port` de `vite.config.ts` y `build.devUrl` de `src-tauri/tauri.conf.json`.
-
-**`error LNK2001: símbolo externo anon.… sin resolver`** al compilar.
-Artefactos de compilación incremental corruptos, normalmente por haber
-interrumpido un enlazado a medias. Se arregla borrando solo eso:
+**`Error: Port 5273 is already in use`** when running `npm run app:dev`.
+A previous dev server is still alive. The port is fixed on purpose
+(`strictPort`): the window points at that exact URL. Free it with:
 
 ```bash
-rm -rf src-tauri/target/debug/incremental    # o cargo clean -p sessions
+npm run dev:free      # kills only the node process holding 5273
 ```
 
-**El agente aparece como «no instalado»** en el diálogo de nueva sesión. La app
-busca el ejecutable en el `PATH` respetando `PATHEXT` en Windows. Ajusta
-`command` o `command_windows` en `agents.toml` (los CLIs instalados con npm son
-`.cmd`) o indica la ruta absoluta.
+**`error LNK2001: unresolved external symbol anon.…`** while compiling.
+Corrupted incremental artifacts, usually from an interrupted link. Fix:
 
-**Una sesión se queda en blanco al arrancar.** Es señal de que nadie ha
-contestado a la consulta `ESC[6n` de ConPTY. Ocurre si se libera el terminal de
-una sesión viva; la app no lo hace, pero si tocas `max_live_terminals` déjalo en
-2 o más.
+```bash
+rm -rf src-tauri/target/debug/incremental    # or cargo clean -p sessions
+```
+
+**An agent shows as "not installed"** in the new-session dialog. The app looks
+the executable up on `PATH` honouring `PATHEXT` on Windows. Adjust `command` /
+`command_windows` in `agents.toml` (npm-installed CLIs are `.cmd`) or give an
+absolute path.
+
+**A session is blank on startup.** Nobody answered ConPTY's `ESC[6n]`. This
+happens if a live session's terminal is released; the app never does, but if you
+touch `max_live_terminals` keep it at 2 or more.
 
 ---
 
-## Seguridad
+## Security
 
-* La app no gestiona claves de API: cada CLI usa las suyas. Si pones un token en
-  `[agent.env]`, ese valor queda en `agents.toml`, en tu carpeta de usuario.
-* `agents.toml` **ejecuta procesos y define su entorno**: trátalo como código y no
-  cargues ficheros de terceros sin revisarlos.
-* La base de datos de OpenCode se abre siempre en modo solo lectura.
-* La ventana usa CSP restrictiva y solo se conceden los permisos de Tauri que la
-  app necesita (diálogo de carpetas, abrir rutas y control de la ventana).
+* The app stores no API keys: each CLI uses its own. A token placed in
+  `[agent.env]` lives in `agents.toml`, in your user folder.
+* `agents.toml` **runs processes and defines their environment**: treat it as
+  code and never load third-party files unreviewed.
+* Auto-install only runs `winget`/`npm i -g` for agents that declare an
+  `install` argv and whose executable is missing; failures never block startup.
+* The window uses a restrictive CSP and only the Tauri permissions the app needs
+  (folder dialog, opening paths and window control).

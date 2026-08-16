@@ -317,7 +317,7 @@ pub fn session_restart(
     let previous = state
         .store
         .session(&session_id)
-        .ok_or_else(|| format!("sesión {session_id} desconocida"))?;
+        .ok_or_else(|| format!("unknown session {session_id}"))?;
     relaunch(&state, &previous, resume)
 }
 

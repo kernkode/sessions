@@ -42,7 +42,7 @@ impl Store {
                     let backup = file.with_extension(format!("corrupt-{stamp}.json"));
                     let _ = std::fs::rename(&file, &backup);
                     eprintln!(
-                        "Sessions: {} no se pudo leer ({e}); se guardó una copia en {}",
+                        "Sessions: {} could not be read ({e}); a backup was saved to {}",
                         file.display(),
                         backup.display()
                     );

@@ -78,14 +78,14 @@ function turnDoneNotice() {
   } catch {
     // Not fatal: the title flash below still applies.
   }
-  const flash = "✔ turno terminado — Sessions";
+  const flash = "✔ turn finished — Sessions";
   document.title = flash;
   window.setTimeout(() => {
     document.title = "Sessions";
   }, 4000);
   try {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Sessions", { body: "Turno terminado" });
+      new Notification("Sessions", { body: "Turn finished" });
     }
   } catch {
     // Web notifications are best-effort.
@@ -159,7 +159,7 @@ export const useStore = create<State>((set, get) => ({
       pool.setInputRejectedHandler((id) => {
         const s = get();
         if (s.alive.includes(id)) return;
-        s.notify("La sesión terminó. Pulsa Relanzar o Reanudar para volver a abrirla.");
+        s.notify("The session ended. Press Relaunch or Resume to reopen it.");
       });
 
       // Metrics live in their own map so lists are not re-rendered.
@@ -192,7 +192,7 @@ export const useStore = create<State>((set, get) => ({
         if (!auto) {
           pool.write(
             session_id,
-            `\r\n\x1b[38;5;244m── proceso terminado (código ${code}) ──\x1b[0m\r\n`,
+            `\r\n\x1b[38;5;244m── process ended (code ${code}) ──\x1b[0m\r\n`,
           );
         }
         pool.collect(new Set(get().alive));
@@ -254,9 +254,9 @@ export const useStore = create<State>((set, get) => ({
 
     if (result.failed.length > 0) {
       const [title, reason] = result.failed[0];
-      get().notify("No se pudo reanudar «" + title + "»: " + reason);
+      get().notify("Could not resume “" + title + "”: " + reason);
     } else if (result.sessions.length > 1) {
-      get().notify(result.sessions.length + " sesiones reanudadas");
+      get().notify(result.sessions.length + " sessions resumed");
     }
 
     // The resumed sessions carry new ids, so whatever was selected before no
@@ -273,7 +273,7 @@ export const useStore = create<State>((set, get) => ({
       set({ config });
       const issues = config.issues.length;
       get().notify(
-        issues > 0 ? `Configuración recargada con ${issues} aviso(s)` : "Configuración recargada",
+        issues > 0 ? `Configuration reloaded with ${issues} warning(s)` : "Configuration reloaded",
       );
     } catch (e) {
       get().notify(String(e));

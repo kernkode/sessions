@@ -24,18 +24,18 @@ pub fn run() {
     let paths = match Paths::resolve() {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("Sessions: no se pudo resolver ~/.sessions: {e}");
+            eprintln!("Sessions: could not resolve ~/.sessions: {e}");
             return;
         }
     };
     if let Err(e) = paths.bootstrap() {
-        eprintln!("Sessions: no se pudo preparar {}: {e}", paths.root.display());
+        eprintln!("Sessions: could not prepare {}: {e}", paths.root.display());
     }
 
     let config = match ConfigStore::load(paths.clone()) {
         Ok(c) => Arc::new(c),
         Err(e) => {
-            eprintln!("Sessions: error cargando configuración: {e}");
+            eprintln!("Sessions: error loading configuration: {e}");
             return;
         }
     };
@@ -63,5 +63,5 @@ pub fn run() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error al arrancar Sessions");
+        .expect("error starting Sessions");
 }

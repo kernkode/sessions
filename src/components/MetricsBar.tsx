@@ -10,7 +10,7 @@ export function MetricsBar() {
     return (
       <div className="metrics">
         <span className="metric">
-          <span className="k">sin sesión</span>
+          <span className="k">no session</span>
         </span>
       </div>
     );
@@ -28,17 +28,17 @@ export function MetricsBar() {
         v={fmtRate(m?.tokens_per_second ?? 0)}
         cls={(m?.tokens_per_second ?? 0) > 0 ? "acc" : ""}
       />
-      <Metric k="pico" v={fmtRate(m?.peak_tokens_per_second ?? 0)} />
+      <Metric k="peak" v={fmtRate(m?.peak_tokens_per_second ?? 0)} />
 
       <div className="sep" />
 
       <div
         className="gauge"
         title={
-          window ? `${used} de ${window} tokens de contexto` : "Ventana de contexto desconocida"
+          window ? `${used} of ${window} context tokens` : "Unknown context window"
         }
       >
-        <span className="k">contexto</span>
+        <span className="k">context</span>
         <div className="gauge-bar">
           <div className={`gauge-fill ${level}`} style={{ width: `${pct ?? 0}%` }} />
         </div>
@@ -51,19 +51,19 @@ export function MetricsBar() {
 
       <div className="sep" />
 
-      <Metric k="entrada" v={fmtTokens(m?.total_input_tokens ?? 0)} />
-      <Metric k="salida" v={fmtTokens(m?.total_output_tokens ?? 0)} />
-      <Metric k="caché" v={fmtTokens((m?.cache_read_tokens ?? 0) + (m?.cache_write_tokens ?? 0))} />
-      {(m?.reasoning_tokens ?? 0) > 0 && <Metric k="razonam." v={fmtTokens(m!.reasoning_tokens)} />}
-      <Metric k="turnos" v={String(m?.turns ?? 0)} />
-      <Metric k="coste" v={fmtCost(m?.cost_usd ?? 0)} cls={(m?.cost_usd ?? 0) > 0 ? "ok" : ""} />
+      <Metric k="input" v={fmtTokens(m?.total_input_tokens ?? 0)} />
+      <Metric k="output" v={fmtTokens(m?.total_output_tokens ?? 0)} />
+      <Metric k="cache" v={fmtTokens((m?.cache_read_tokens ?? 0) + (m?.cache_write_tokens ?? 0))} />
+      {(m?.reasoning_tokens ?? 0) > 0 && <Metric k="reasoning" v={fmtTokens(m!.reasoning_tokens)} />}
+      <Metric k="turns" v={String(m?.turns ?? 0)} />
+      <Metric k="cost" v={fmtCost(m?.cost_usd ?? 0)} cls={(m?.cost_usd ?? 0) > 0 ? "ok" : ""} />
 
       <div className="sep" />
 
-      <Metric k="salida pty" v={`${fmtBytes(m?.bytes_per_second ?? 0)}/s`} />
+      <Metric k="pty out" v={`${fmtBytes(m?.bytes_per_second ?? 0)}/s`} />
       <Metric k="total" v={fmtBytes(m?.total_bytes ?? 0)} />
       {session.exit_code !== null && session.status === "exited" && (
-        <Metric k="código" v={String(session.exit_code)} cls={session.exit_code === 0 ? "ok" : "err"} />
+        <Metric k="code" v={String(session.exit_code)} cls={session.exit_code === 0 ? "ok" : "err"} />
       )}
     </div>
   );

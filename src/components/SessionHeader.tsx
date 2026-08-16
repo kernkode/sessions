@@ -22,7 +22,7 @@ function GitBar({ cwd }: { cwd: string }) {
   if (!st || !st[1]) return null;
   const [dirty, branch] = st;
   const act = async (fn: () => Promise<string>, msg: string) => {
-    if (dirty && !window.confirm("Hay cambios sin commitear; la operación los descartará. ¿Continuar?"))
+    if (dirty && !window.confirm("There are uncommitted changes; this will discard them. Continue?"))
       return;
     try {
       await fn();
@@ -33,14 +33,14 @@ function GitBar({ cwd }: { cwd: string }) {
     refresh();
   };
   return (
-    <span className="chip" title={dirty ? "cambios sin commitear" : "árbol limpio"}>
+    <span className="chip" title={dirty ? "uncommitted changes" : "clean tree"}>
       <IconBranch width={11} height={11} />
       {branch}
       {dirty ? " •" : ""}
-      <button title="Deshacer (checkpoint anterior)" onClick={() => void act(() => api.gitUndo(cwd), "Deshecho")}>
+      <button title="Undo (previous checkpoint)" onClick={() => void act(() => api.gitUndo(cwd), "Undone")}>
         ↩
       </button>
-      <button title="Rehacer" onClick={() => void act(() => api.gitRedo(cwd), "Rehecho")}>
+      <button title="Redo" onClick={() => void act(() => api.gitRedo(cwd), "Redone")}>
         ↪
       </button>
     </span>
@@ -63,7 +63,7 @@ export function SessionHeader() {
     return (
       <div className="header">
         <div className="crumbs">
-          <span className="crumb dim">Ninguna sesión seleccionada</span>
+          <span className="crumb dim">No session selected</span>
         </div>
       </div>
     );
@@ -80,9 +80,9 @@ export function SessionHeader() {
         <span className={`dot ${status}`} />
         <span
           className="crumb"
-          title="Doble clic para renombrar"
+          title="Double-click to rename"
           onDoubleClick={() => {
-            const t = window.prompt("Título de la sesión", session.title);
+            const t = window.prompt("Session title", session.title);
             if (t && t.trim()) void renameSession(session.id, t.trim());
           }}
         >
@@ -94,23 +94,23 @@ export function SessionHeader() {
         </span>
       </div>
 
-      <span className="chip" title={`Agente: ${agent?.name ?? session.agent_id}`}>
+      <span className="chip" title={`Agent: ${agent?.name ?? session.agent_id}`}>
         <span className="dot" style={{ background: agent?.color ?? "var(--txt-3)", boxShadow: "none" }} />
         {agent?.name ?? session.agent_id}
       </span>
 
       {m?.model && (
-        <span className="chip mono" title="Modelo que informa el CLI">
+        <span className="chip mono" title="Model reported by the CLI">
           {m.model}
         </span>
       )}
       {m?.effort && (
-        <span className="chip mono" title="Esfuerzo de razonamiento del CLI">
+        <span className="chip mono" title="CLI reasoning effort">
           {m.effort}
         </span>
       )}
       <GitBar cwd={session.cwd} />
-      <span className="chip mono" title="Tiempo de sesión">
+      <span className="chip mono" title="Session uptime">
         {fmtDuration(m?.uptime_ms ?? 0)}
       </span>
 
@@ -118,14 +118,14 @@ export function SessionHeader() {
 
       <button
         className="icon-btn"
-        title="Buscar en el terminal (Ctrl+Shift+F)"
+        title="Search in terminal (Ctrl+Shift+F)"
         onClick={() => setDialog("search")}
       >
         <IconSearch />
       </button>
       <button
         className="icon-btn"
-        title="Limpiar terminal (Ctrl+Shift+K)"
+        title="Clear terminal (Ctrl+Shift+K)"
         onClick={() => void clearTerminal(session.id)}
       >
         <IconTerminal />
@@ -133,27 +133,27 @@ export function SessionHeader() {
       {live ? (
         <button
           className="chip btn danger"
-          title="Detener proceso"
+          title="Stop process"
           onClick={() => void stopSession(session.id)}
         >
-          <IconStop width={13} height={13} /> Detener
+          <IconStop width={13} height={13} /> Stop
         </button>
       ) : (
         <>
           <button
             className="chip btn"
-            title="Volver a lanzar"
+            title="Relaunch"
             onClick={() => void restartSession(session.id, false)}
           >
-            <IconPlay width={13} height={13} /> Relanzar
+            <IconPlay width={13} height={13} /> Relaunch
           </button>
           {session.external_id && (
             <button
               className="chip btn"
-              title={`Reanudar la sesión ${session.external_id} del CLI`}
+              title={`Resume CLI session ${session.external_id}`}
               onClick={() => void restartSession(session.id, true)}
             >
-              <IconRefresh width={13} height={13} /> Reanudar
+              <IconRefresh width={13} height={13} /> Resume
             </button>
           )}
         </>
