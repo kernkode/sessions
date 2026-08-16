@@ -19,6 +19,46 @@ pub const EV_EXIT: &str = "session:exit";
 pub const EV_METRICS: &str = "session:metrics";
 pub const EV_CONFIG: &str = "config:reloaded";
 
+/// Installs, in the background and without a shell, every enabled agent whose
+/// executable is missing but that declares an `install` argv. Runs once at
+/// startup so a fresh machine gets its CLIs without manual setup; failures are
+/// logged and never block the app.
+pub fn spawn_agent_installer(config: Arc<ConfigStore>) {
+    let _ = std::thread::Builder::new()
+        .name("sessions-agent-install".into())
+        .spawn(move || {
+            for a in config.snapshot().agents {
+                if a.resolve_program().is_some() || a.install.is_empty() {
+                    continue;
+                }
+                let (prog, args) = a.install.split_first().unwrap();
+                // Resolve through PATH/PATHEXT so `npm` finds npm.cmd on Windows.
+                let prog = match crate::config::agents::which(prog) {
+                    Some(p) => p,
+                    None => {
+                        eprintln!("Sessions: «{}» sin instalador disponible ({prog} no está en PATH)", a.id);
+                        continue;
+                    }
+                };
+                eprintln!("Sessions: instalando «{}»…", a.id);
+                match std::process::Command::new(prog)
+                    .args(args)
+                    .env("npm_config_fund", "false")
+                    .env("npm_config_audit", "false")
+                    .output()
+                {
+                    Ok(out) if out.status.success() => eprintln!("Sessions: «{}» instalado.", a.id),
+                    Ok(out) => eprintln!(
+                        "Sessions: no se pudo instalar «{}»: {}",
+                        a.id,
+                        String::from_utf8_lossy(&out.stderr).trim()
+                    ),
+                    Err(e) => eprintln!("Sessions: no se pudo instalar «{}»: {e}", a.id),
+                }
+            }
+        });
+}
+
 /// Binary PTY output channels, one per session.
 ///
 /// Terminal output travels through a `Channel` as raw bytes: this avoids

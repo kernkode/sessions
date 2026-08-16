@@ -51,6 +51,8 @@ pub fn run() {
         .setup(move |app| {
             let state = AppState::new(app.handle().clone(), config.clone(), store.clone());
             app.manage(state);
+            // Best-effort: install any missing CLI that declares an `install` argv.
+            crate::app::spawn_agent_installer(config.clone());
             Ok(())
         })
         .on_window_event(|window, event| {

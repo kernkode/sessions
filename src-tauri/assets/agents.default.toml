@@ -14,6 +14,7 @@
 #    metrics           claude-jsonl | codex-rollout | opencode-sqlite | pi-jsonl | none
 #    metrics_path      ruta alternativa del origen de métricas
 #    busy_hints        textos en la salida que indican "trabajando"
+#    install           argv para instalar el CLI si falta (una vez, en 2.º plano)
 # ─────────────────────────────────────────────────────────────────────────────
 
 schema = 1
@@ -27,6 +28,7 @@ command_windows = "claude.cmd"
 args = ["--dangerously-skip-permissions"]
 resume_args = ["--resume", "{session_id}"]
 continue_args = ["--continue"]
+install = ["npm", "install", "-g", "@anthropic-ai/claude-code"]
 metrics = "claude-jsonl"
 color = "#d97757"
 # Además de los textos, los glifos del spinner que el TUI anima mientras
@@ -45,6 +47,7 @@ command_windows = "codex.cmd"
 args = []
 resume_args = ["resume", "{session_id}"]
 continue_args = ["resume", "--last"]
+install = ["npm", "install", "-g", "@openai/codex"]
 metrics = "codex-rollout"
 color = "#10a37f"
 busy_hints = ["Esc to interrupt", "Working", "thinking"]
@@ -60,6 +63,7 @@ command_windows = "opencode.exe"
 args = []
 resume_args = ["--session", "{session_id}"]
 continue_args = ["--continue"]
+install = ["npm", "install", "-g", "opencode-ai"]
 metrics = "opencode-sqlite"
 color = "#7c93ff"
 busy_hints = ["working", "thinking"]
@@ -74,6 +78,8 @@ command = "pi"
 args = []
 resume_args = ["--session", "{session_id}"]
 continue_args = ["--continue"]
+# pi no vive en npm global; deja aquí su instalador si quieres auto-instalarlo.
+# install = ["npm", "install", "-g", "<paquete-de-pi>"]
 metrics = "pi-jsonl"
 color = "#c678dd"
 

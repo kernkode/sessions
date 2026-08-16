@@ -173,6 +173,9 @@ mod tests {
         assert!(snap.issues.is_empty(), "issues: {:?}", snap.issues);
         assert!(snap.agents.iter().any(|a| a.id == "claude"));
         assert!(snap.agents.iter().any(|a| a.id == "pi"));
+        // The factory config ships an auto-install argv for Claude Code.
+        let claude = snap.agents.iter().find(|a| a.id == "claude").unwrap();
+        assert!(claude.install.iter().any(|s| s.contains("claude-code")));
         fs::remove_dir_all(dir).ok();
     }
 

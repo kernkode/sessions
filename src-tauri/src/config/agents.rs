@@ -76,6 +76,11 @@ pub struct Agent {
     #[serde(default)]
     pub metrics_path: Option<String>,
 
+    /// argv used to install the CLI when its executable is missing (run once at
+    /// startup, in the background, without a shell). Empty = no auto-install.
+    #[serde(default)]
+    pub install: Vec<String>,
+
     #[serde(default)]
     pub color: Option<String>,
     /// Words in the output that mean the agent is working.
