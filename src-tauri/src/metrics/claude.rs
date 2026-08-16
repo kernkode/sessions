@@ -31,6 +31,8 @@ pub struct ClaudeReader {
     /// The last `/model` entry carried an explicit argument, so the stdout
     /// echo that follows must not overwrite the model id with a display name.
     model_had_args: bool,
+    /// File to skip when re-locating after a `/clear` (the pre-clear session).
+    avoid: Option<PathBuf>,
     dirty: bool,
 }
 
@@ -47,6 +49,7 @@ impl ClaudeReader {
             usage: Usage::default(),
             previous_ts: None,
             model_had_args: false,
+            avoid: None,
             dirty: false,
         }
     }
@@ -60,11 +63,13 @@ impl ClaudeReader {
         if self.tail.is_some() {
             return;
         }
-        let candidate = newest_file(&self.dir, self.since_ms)
-            .or_else(|| find_by_cwd(self.dir.parent(), &self.cwd, self.since_ms));
+        let candidate = newest_file(&self.dir, self.since_ms, self.avoid.as_deref())
+            .or_else(|| find_by_cwd(self.dir.parent(), &self.cwd, self.since_ms))
+            .filter(|p| self.avoid.as_ref() != Some(p));
         if let Some(p) = candidate {
             let id = p.file_stem().map(|s| s.to_string_lossy().to_string());
             self.usage.external_id = id;
+            self.avoid = None;
             self.tail = Some(TailReader::new(p));
         }
     }
@@ -146,6 +151,18 @@ impl ClaudeReader {
     /// CLI stdout («Set model to …»). Adopt the new model right away instead
     /// of waiting for the next assistant entry.
     fn process_local_command(&mut self, content: &str) {
+        // `/clear` starts a brand-new CLI session in a fresh JSONL file. Drop
+        // the old tail and re-locate so the saved external_id points at the new
+        // session and resuming after a restart lands there, not pre-clear.
+        if content.contains("<command-name>/clear</command-name>") {
+            if let Some(t) = &self.tail {
+                self.avoid = Some(t.path().to_path_buf());
+            }
+            self.tail = None;
+            self.since_ms = crate::model::now_ms();
+            self.dirty = true;
+            return;
+        }
         if content.contains("<command-name>/model</command-name>") {
             let args = between(content, "<command-args>", "</command-args>").trim().to_string();
             if args.is_empty() {
@@ -241,10 +258,13 @@ fn resolve_project_dir(base: &Path, cwd: &str) -> PathBuf {
     direct
 }
 
-pub(crate) fn newest_file(dir: &Path, since_ms: u64) -> Option<PathBuf> {
+pub(crate) fn newest_file(dir: &Path, since_ms: u64, avoid: Option<&Path>) -> Option<PathBuf> {
     let mut best: Option<(u64, PathBuf)> = None;
     for e in std::fs::read_dir(dir).ok()?.flatten() {
         let p = e.path();
+        if avoid == Some(p.as_path()) {
+            continue;
+        }
         if p.extension().and_then(|s| s.to_str()) != Some("jsonl") {
             continue;
         }
@@ -271,7 +291,7 @@ pub(crate) fn find_by_cwd(base: Option<&Path>, cwd_norm: &str, since_ms: u64) ->
         if !d.is_dir() {
             continue;
         }
-        if let Some(f) = newest_file(&d, since_ms) {
+        if let Some(f) = newest_file(&d, since_ms, None) {
             let mtime = std::fs::metadata(&f).ok().map(|m| mtime_ms(&m)).unwrap_or(0);
             candidates.push((mtime, f));
         }
@@ -537,6 +557,58 @@ mod tests {
         h.flush().unwrap();
         let u3 = r.poll().expect("interactive effort must emit an update");
         assert_eq!(u3.effort.as_deref(), Some("low"));
+        std::fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn clear_switches_to_the_new_session_file() {
+        let (base, cwd) = env("p6");
+        let dir = base.join(slug_cwd(&cwd));
+        let fa = dir.join("sess-1.jsonl");
+        std::fs::write(&fa, b"").unwrap();
+
+        let mut r = ClaudeReader::new(&base, &cwd, 0);
+        let mut h = std::fs::OpenOptions::new().append(true).open(&fa).unwrap();
+        writeln!(
+            h,
+            "{}",
+            assistant_line("2026-08-15T04:22:14.000Z", 1000, 0, 400, "claude-opus-5")
+        )
+        .unwrap();
+        h.flush().unwrap();
+        assert_eq!(r.poll().unwrap().external_id.as_deref(), Some("sess-1"));
+
+        // `/clear` lands in the old file; the new session goes to a new file.
+        writeln!(
+            h,
+            r#"{{"type":"user","timestamp":"2026-08-15T04:30:00.000Z","message":{{"role":"user","content":"<command-name>/clear</command-name>\n<command-args></command-args>"}}}}"#
+        )
+        .unwrap();
+        h.flush().unwrap();
+        let _ = r.poll();
+
+        let fb = dir.join("sess-2.jsonl");
+        std::fs::write(&fb, b"").unwrap();
+        let mut h2 = std::fs::OpenOptions::new().append(true).open(&fb).unwrap();
+        writeln!(
+            h2,
+            "{}",
+            assistant_line("2026-08-15T04:31:00.000Z", 500, 0, 100, "claude-opus-5")
+        )
+        .unwrap();
+        h2.flush().unwrap();
+
+        // The reader must jump to the new file and report the new session id.
+        let mut seen = None;
+        for _ in 0..3 {
+            if let Some(u) = r.poll() {
+                seen = u.external_id.clone();
+            }
+            if seen.as_deref() == Some("sess-2") {
+                break;
+            }
+        }
+        assert_eq!(seen.as_deref(), Some("sess-2"), "must follow /clear to the new file");
         std::fs::remove_dir_all(base).ok();
     }
 

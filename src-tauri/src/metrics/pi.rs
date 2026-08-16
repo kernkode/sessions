@@ -72,7 +72,7 @@ impl PiReader {
             .external_id
             .as_deref()
             .and_then(|id| by_external_id(&self.dir, id))
-            .or_else(|| newest_file(&self.dir, self.since_ms))
+            .or_else(|| newest_file(&self.dir, self.since_ms, None))
             .or_else(|| find_by_cwd(self.dir.parent(), &self.cwd, self.since_ms));
         if let Some(p) = candidate {
             // File names are `<ts>_<uuid>.jsonl`; the id lives after the last `_`.
