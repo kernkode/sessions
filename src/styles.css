@@ -739,15 +739,78 @@ main {
 }
 
 .gauge-fill {
+  position: relative;
   height: 100%;
   background: var(--ok);
   transition: width 0.25s ease;
+  overflow: hidden;
 }
 .gauge-fill.warn {
   background: var(--warn);
 }
 .gauge-fill.err {
   background: var(--err);
+}
+/* Moving sheen across the context gauge so it feels alive. */
+.gauge-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: gauge-shimmer 1.8s linear infinite;
+}
+@keyframes gauge-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Pulsing dot shown while the agent is working. */
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--acc);
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--acc) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+/* tok/s sparkline. */
+.spark {
+  color: var(--txt-3);
+  align-self: center;
+}
+.spark polyline {
+  stroke: currentColor;
+}
+.spark.on {
+  color: var(--acc);
+}
+
+/* Value flash when a metric changes. */
+.metric .v.tick {
+  display: inline-block;
+  animation: value-tick 0.4s ease;
+}
+@keyframes value-tick {
+  from {
+    color: var(--acc-2);
+    transform: translateY(-1px);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 .sep {
