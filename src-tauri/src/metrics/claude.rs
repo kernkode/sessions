@@ -26,8 +26,12 @@ pub struct ClaudeReader {
     since_ms: u64,
     tail: Option<TailReader>,
     usage: Usage,
-    /// Timestamp of the previous entry, used to measure the turn duration.
-    previous_ts: Option<i64>,
+    /// Last processed assistant `message.id`; Claude re-logs the same message
+    /// several times and those duplicates must not count as new turns.
+    last_msg_id: Option<String>,
+    /// Timestamp of the previous distinct assistant message, to measure the
+    /// generation window of the next one.
+    last_assistant_ts: Option<i64>,
     /// The last `/model` entry carried an explicit argument, so the stdout
     /// echo that follows must not overwrite the model id with a display name.
     model_had_args: bool,
@@ -47,7 +51,8 @@ impl ClaudeReader {
             since_ms,
             tail: None,
             usage: Usage::default(),
-            previous_ts: None,
+            last_msg_id: None,
+            last_assistant_ts: None,
             model_had_args: false,
             avoid: None,
             dirty: false,
@@ -82,6 +87,15 @@ impl ClaudeReader {
         let ts = v.get("timestamp").and_then(Value::as_str).and_then(parse_iso8601_ms);
 
         if v.get("type").and_then(Value::as_str) == Some("assistant") {
+            // Claude re-logs the same assistant message several times (same id,
+            // same usage, milliseconds apart). Counting those as turns would
+            // divide the full output by a tiny gap and report absurd tok/s.
+            let msg_id = v.pointer("/message/id").and_then(Value::as_str).map(|s| s.to_string());
+            if msg_id.is_some() && msg_id == self.last_msg_id {
+                return;
+            }
+            self.last_msg_id = msg_id;
+
             // Claude Code appends "synthetic" entries (interrupts, local
             // notices) with model "<synthetic>" and zero usage; adopting them
             // would overwrite the real model and zero the context window.
@@ -118,13 +132,19 @@ impl ClaudeReader {
                     if let Some(e) = v.get("effort").and_then(Value::as_str) {
                         self.usage.effort = Some(e.to_string());
                     }
-                    if let (Some(t), Some(prev)) = (ts, self.previous_ts) {
+                    // Generation window = time since the previous distinct
+                    // assistant message, so duplicates/tool latency between
+                    // entries of the same message cannot inflate tok/s.
+                    if let (Some(t), Some(prev)) = (ts, self.last_assistant_ts) {
                         let duration = (t - prev).max(0) as u64;
                         // Discard huge gaps (the user away between turns).
                         if duration > 0 && duration < 30 * 60 * 1000 {
                             self.usage.last_turn_output = output;
                             self.usage.last_turn_ms = duration;
                         }
+                    }
+                    if let Some(t) = ts {
+                        self.last_assistant_ts = Some(t);
                     }
                     self.dirty = true;
                 }
@@ -143,9 +163,6 @@ impl ClaudeReader {
             }
         }
 
-        if let Some(t) = ts {
-            self.previous_ts = Some(t);
-        }
     }
 
     /// `/model` writes two `user` entries: the command with its args and the
@@ -161,6 +178,9 @@ impl ClaudeReader {
             }
             self.tail = None;
             self.since_ms = crate::model::now_ms();
+            // Fresh session: do not treat its messages as duplicates of the old one.
+            self.last_msg_id = None;
+            self.last_assistant_ts = None;
             self.dirty = true;
             return;
         }
@@ -376,8 +396,19 @@ mod tests {
     }
 
     fn assistant_line(ts: &str, input: u64, cache_read: u64, output: u64, model: &str) -> String {
+        assistant_line_id(ts, "msg-auto", input, cache_read, output, model)
+    }
+
+    fn assistant_line_id(
+        ts: &str,
+        id: &str,
+        input: u64,
+        cache_read: u64,
+        output: u64,
+        model: &str,
+    ) -> String {
         format!(
-            r#"{{"type":"assistant","timestamp":"{ts}","sessionId":"sess-xyz","cwd":"C:\\tmp\\p","effort":"high","message":{{"model":"{model}","usage":{{"input_tokens":{input},"cache_creation_input_tokens":0,"cache_read_input_tokens":{cache_read},"output_tokens":{output},"output_tokens_details":{{"thinking_tokens":7}}}}}}}}"#
+            r#"{{"type":"assistant","timestamp":"{ts}","sessionId":"sess-xyz","cwd":"C:\\tmp\\p","effort":"high","message":{{"id":"{id}","model":"{model}","usage":{{"input_tokens":{input},"cache_creation_input_tokens":0,"cache_read_input_tokens":{cache_read},"output_tokens":{output},"output_tokens_details":{{"thinking_tokens":7}}}}}}}}"#
         )
     }
 
@@ -394,7 +425,7 @@ mod tests {
         let mut h = std::fs::OpenOptions::new().append(true).open(&f).unwrap();
         // A user entry that marks the start of the turn.
         writeln!(h, r#"{{"type":"user","timestamp":"2026-08-15T04:22:10.000Z"}}"#).unwrap();
-        writeln!(h, "{}", assistant_line("2026-08-15T04:22:14.000Z", 1000, 200, 400, "claude-opus-5")).unwrap();
+        writeln!(h, "{}", assistant_line_id("2026-08-15T04:22:14.000Z", "m1", 1000, 200, 400, "claude-opus-5")).unwrap();
         h.flush().unwrap();
 
         let u = r.poll().expect("usage expected");
@@ -408,19 +439,29 @@ mod tests {
         assert_eq!(u.model.as_deref(), Some("claude-opus-5"));
         assert_eq!(u.effort.as_deref(), Some("high"));
         assert_eq!(u.external_id.as_deref(), Some("sess-xyz"));
-        // 400 tokens in 4 s = 100 tok/s.
-        assert_eq!(u.last_turn_ms, 4000);
-        assert!((u.turn_tps() - 100.0).abs() < 0.001, "tps: {}", u.turn_tps());
+        // First message has no previous assistant to measure against.
+        assert_eq!(u.last_turn_ms, 0);
 
-        // Second turn: accumulates and does not repeat the first.
-        writeln!(h, r#"{{"type":"user","timestamp":"2026-08-15T04:23:00.000Z"}}"#).unwrap();
-        writeln!(h, "{}", assistant_line("2026-08-15T04:23:02.000Z", 1600, 400, 100, "claude-opus-5")).unwrap();
+        // Second distinct message: window = 04:23:02 - 04:22:14 = 48 s.
+        writeln!(h, "{}", assistant_line_id("2026-08-15T04:23:02.000Z", "m2", 1600, 400, 100, "claude-opus-5")).unwrap();
         h.flush().unwrap();
         let u2 = r.poll().unwrap();
         assert_eq!(u2.turns, 2);
         assert_eq!(u2.total_output, 500);
         assert_eq!(u2.context_used, 2000);
-        assert!(r.poll().is_none(), "no new lines means no update");
+
+        // Third message 4 s after m2 with 200 out -> 200/4s = 50 tok/s.
+        writeln!(h, "{}", assistant_line_id("2026-08-15T04:23:06.000Z", "m3", 1600, 400, 200, "claude-opus-5")).unwrap();
+        h.flush().unwrap();
+        let u3 = r.poll().unwrap();
+        assert_eq!(u3.turns, 3);
+        assert_eq!(u3.last_turn_ms, 4000);
+        assert!((u3.turn_tps() - 50.0).abs() < 0.001, "tps: {}", u3.turn_tps());
+
+        // A duplicate log of the same message must not add a turn.
+        writeln!(h, "{}", assistant_line_id("2026-08-15T04:23:07.000Z", "m3", 1600, 400, 200, "claude-opus-5")).unwrap();
+        h.flush().unwrap();
+        assert!(r.poll().is_none(), "duplicate message must be ignored");
 
         std::fs::remove_dir_all(base).ok();
     }
